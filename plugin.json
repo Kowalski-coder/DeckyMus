@@ -1,0 +1,11 @@
+{
+  "name": "DeckyMus",
+  "author": "Kowalski-coder",
+  "version": "0.9.0",
+  "flags": ["root"],
+  "api_version": 1,
+  "publish": {
+    "tags": ["audio", "music", "player", "yandex", "youtube", "vk", "steamdeck"],
+    "description": "Музыкальный плеер с возможностью воспроизведения и скачивания музыкальных треков со стриминговых площадок специально для Decky Loader Россия"
+  }
+}
