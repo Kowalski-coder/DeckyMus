@@ -72,7 +72,7 @@ export const AboutTab: FC = () => {
                     border: "1px solid rgba(59, 130, 246, 0.4)",
                   }}
                 >
-                  v0.9.0
+                  v0.9.1
                 </span>
               </div>
               <div style={{ fontSize: "13px", color: "#94a3b8" }}>

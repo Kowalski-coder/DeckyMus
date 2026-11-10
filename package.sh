@@ -10,7 +10,10 @@ rm -rf "$TMP_DIR" DeckyMus.zip
 mkdir -p "$TMP_DIR/DeckyMus"
 
 # Copy all required plugin files
-cp -r main.py dist assets py_modules plugin.json package.json README.md "$TMP_DIR/DeckyMus/"
+cp -r main.py dist assets py_modules bin plugin.json package.json README.md "$TMP_DIR/DeckyMus/"
+
+# Ensure bundled binaries are executable
+chmod +x "$TMP_DIR/DeckyMus/bin/"* 2>/dev/null || true
 
 # Clean python cache
 find "$TMP_DIR/DeckyMus" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true

@@ -5215,7 +5215,7 @@ const AboutTab = () => {
                                                     backgroundColor: "rgba(59, 130, 246, 0.25)",
                                                     color: "#60a5fa",
                                                     border: "1px solid rgba(59, 130, 246, 0.4)",
-                                                }, children: "v0.9.0" })] }), SP_JSX.jsx("div", { style: { fontSize: "13px", color: "#94a3b8" }, children: t("aboutTagline") })] })] }) }) }), SP_JSX.jsx(DFL.PanelSection, { title: t("featuresTitle"), children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: {
+                                                }, children: "v0.9.1" })] }), SP_JSX.jsx("div", { style: { fontSize: "13px", color: "#94a3b8" }, children: t("aboutTagline") })] })] }) }) }), SP_JSX.jsx(DFL.PanelSection, { title: t("featuresTitle"), children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: {
                             display: "grid",
                             gridTemplateColumns: "repeat(2, 1fr)",
                             gap: "10px",

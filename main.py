@@ -24,8 +24,20 @@ import importlib.util
 # Inject bundled pure-python modules
 PLUGIN_DIR = Path(__file__).resolve().parent
 PY_MODULES = PLUGIN_DIR / "py_modules"
+BIN_DIR = PLUGIN_DIR / "bin"
 if str(PY_MODULES) not in sys.path:
     sys.path.insert(0, str(PY_MODULES))
+
+def _get_bin(name: str) -> str:
+    """Returns path to bundled binary in bin/ if present, falling back to system binary."""
+    bundled = BIN_DIR / name
+    if bundled.is_file():
+        try:
+            bundled.chmod(0o755)
+        except Exception:
+            pass
+        return str(bundled)
+    return name
 
 # Force preload standard XML and HTML modules so that PyInstaller's stripped/frozen runtime
 # cannot block submodules like xml.etree, xml.dom, and html.parser
@@ -296,15 +308,17 @@ class Plugin:
             if "MEI" in str(env[k]) or k.startswith("PYINSTALLER"):
                 env.pop(k, None)
 
-        env["PATH"] = "/usr/local/bin:/usr/bin:/bin"
+        bin_dir = str(BIN_DIR)
+        env["PATH"] = f"{bin_dir}:/usr/local/bin:/usr/bin:/bin"
         env["HOME"] = str(self.home)
         env["USER"] = self.user_info["username"]
         env["XDG_RUNTIME_DIR"] = f"/run/user/{self.uid}"
         env["PULSE_SERVER"] = f"unix:/run/user/{self.uid}/pulse/native"
         env["PIPEWIRE_RUNTIME_DIR"] = f"/run/user/{self.uid}"
 
+        mpv_bin = _get_bin("mpv")
         cmd = [
-            "mpv",
+            mpv_bin,
             "--idle=yes",
             "--no-video",
             "--no-terminal",
@@ -383,6 +397,15 @@ class Plugin:
 
     async def _main(self):
         logger.info(f"DeckyMus plugin loaded for user {self.user_info['username']}")
+        # Ensure bundled binaries are executable
+        if BIN_DIR.is_dir():
+            for b in BIN_DIR.iterdir():
+                if b.is_file():
+                    try:
+                        b.chmod(0o755)
+                    except Exception as e:
+                        logger.warning(f"Failed to chmod 755 on {b}: {e}")
+
         await asyncio.to_thread(self._ensure_mpv)
 
         # Initialize Yandex Music client if token exists
@@ -869,7 +892,8 @@ class Plugin:
             for k in list(env.keys()):
                 if "MEI" in str(env[k]) or k.startswith("PYINSTALLER"):
                     env.pop(k, None)
-            env["PATH"] = "/usr/local/bin:/usr/bin:/bin"
+            bin_dir = str(BIN_DIR)
+            env["PATH"] = f"{bin_dir}:/usr/local/bin:/usr/bin:/bin"
 
             logger.info(f"Downloading track '{title}' ({track_id}) from {source}...")
 
@@ -936,7 +960,7 @@ class Plugin:
                         continue
 
                     cmd = [
-                        "ffmpeg", "-y",
+                        _get_bin("ffmpeg"), "-y",
                         "-user_agent", ua,
                         "-reconnect", "1",
                         "-reconnect_streamed", "1",
