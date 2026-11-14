@@ -1,9 +1,10 @@
-import { FC, useState, useEffect } from "react";
+import { FC, useState, useEffect, useRef } from "react";
 import {
   PanelSection,
   PanelSectionRow,
   DialogButton,
   TextField,
+  Focusable,
 } from "@decky/ui";
 import { FaPlay, FaPause, FaSync, FaMusic, FaSpinner } from "react-icons/fa";
 import { Track, PlayerStatus } from "../../types";
@@ -28,6 +29,7 @@ export const LocalLibraryTab: FC<LocalLibraryTabProps> = ({ status, onRefresh })
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("");
   const [loadingTrackIdx, setLoadingTrackIdx] = useState<number | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const loadTracks = async () => {
     setLoading(true);
@@ -92,45 +94,45 @@ export const LocalLibraryTab: FC<LocalLibraryTabProps> = ({ status, onRefresh })
         overflowX: "hidden",
       }}
     >
-      <PanelSection title={t("localSectionTitle")}>
+      <PanelSection>
         {/* Controls row */}
         <PanelSectionRow>
-          <div
+          <Focusable
+            flow-children="row"
             style={{
               display: "flex",
-              gap: "10px",
+              gap: "8px",
               width: "100%",
-              minWidth: 0,
-              maxWidth: "100%",
-              boxSizing: "border-box",
               marginBottom: "12px",
               alignItems: "center",
             }}
           >
-            <div style={{ flex: "1 1 0%", minWidth: 0 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
               <TextField
-                label={t("searchTracksPlaceholder")}
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e: any) => setQuery(e?.target?.value || "")}
+                placeholder={t("searchTracksPlaceholder")}
               />
             </div>
-            <div style={{ width: "140px" }}>
-              <DialogButton
-                disabled={loading}
-                onClick={loadTracks}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "6px",
-                  padding: "8px 0",
-                }}
-              >
-                <FaSync className={loading ? "spin" : ""} size={12} />
-                <span>{loading ? t("searchingBtn") : t("refreshBtn")}</span>
-              </DialogButton>
-            </div>
-          </div>
+            <DialogButton
+              className="deckymus-focus-btn"
+              disabled={loading}
+              onClick={loadTracks}
+              style={{
+                width: "40px",
+                minWidth: "40px",
+                height: "40px",
+                padding: "0",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: "8px",
+                flexShrink: 0,
+              }}
+            >
+              <FaSync className={loading ? "spin" : ""} size={14} />
+            </DialogButton>
+          </Focusable>
         </PanelSectionRow>
 
         {/* Tracks List */}
@@ -143,8 +145,8 @@ export const LocalLibraryTab: FC<LocalLibraryTabProps> = ({ status, onRefresh })
               display: "flex",
               flexDirection: "column",
               gap: "6px",
+              padding: "4px 6px",
               boxSizing: "border-box",
-              overflowX: "hidden",
             }}
           >
             <div style={{ fontSize: "12px", color: "#94a3b8", marginBottom: "4px" }}>
@@ -171,88 +173,119 @@ export const LocalLibraryTab: FC<LocalLibraryTabProps> = ({ status, onRefresh })
 
             {filteredTracks.map((item, idx) => {
               const isCurrent = (item.path && status.track?.path === item.path) || (item.id && status.track?.id === item.id);
-              const isPlaying = status.playback_status === "Playing";
+              const isPlaying = isCurrent && status.playback_status === "Playing";
+              const isCurrentPaused = isCurrent && status.playback_status === "Paused";
               const isLoadingThis = loadingTrackIdx === idx;
+
               return (
-                <DialogButton
+                <Focusable
                   key={item.id || item.path || idx}
-                  onClick={() => handlePlay(idx)}
+                  className="deckymus-focus-btn deckymus-track-row"
+                  onActivate={() => {
+                    if (isPlaying) {
+                      rpcPlayPause().then(onRefresh);
+                    } else if (isCurrentPaused) {
+                      rpcPlayPause().then(onRefresh);
+                    } else {
+                      handlePlay(idx);
+                    }
+                  }}
                   style={{
-                    width: "100%",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
                     padding: "8px 12px",
-                    backgroundColor: isCurrent ? "rgba(59, 130, 246, 0.25)" : "rgba(255, 255, 255, 0.04)",
-                    border: isCurrent ? "1px solid rgba(59, 130, 246, 0.6)" : "1px solid transparent",
-                    textAlign: "left",
-                    marginBottom: "4px",
+                    backgroundColor: isPlaying
+                      ? "rgba(59, 130, 246, 0.2)"
+                      : "rgba(255, 255, 255, 0.03)",
+                    border: isPlaying ? "1px solid #3b82f6" : "1px solid rgba(255, 255, 255, 0.06)",
+                    borderRadius: "8px",
+                    gap: "10px",
+                    cursor: "pointer",
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0, flex: 1 }}>
-                    {/* Cover miniature */}
+                  {/* Play / Pause button */}
+                  <div
+                    style={{
+                      minWidth: "36px",
+                      width: "36px",
+                      height: "36px",
+                      padding: "0",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      borderRadius: "50%",
+                      backgroundColor: isPlaying ? "#3b82f6" : "rgba(255, 255, 255, 0.1)",
+                      color: "#fff",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {isLoadingThis ? (
+                      <FaSpinner className="spin" size={12} />
+                    ) : isPlaying ? (
+                      <FaPause size={12} />
+                    ) : (
+                      <FaPlay size={12} style={{ marginLeft: "2px" }} />
+                    )}
+                  </div>
+
+                  {/* Cover miniature */}
+                  {item.art_url ? (
+                    <img
+                      src={item.art_url}
+                      alt=""
+                      style={{ width: "38px", height: "38px", borderRadius: "6px", objectFit: "cover", flexShrink: 0 }}
+                    />
+                  ) : (
                     <div
                       style={{
-                        width: "42px",
-                        height: "42px",
+                        width: "38px",
+                        height: "38px",
                         borderRadius: "6px",
-                        overflow: "hidden",
-                        backgroundColor: "rgba(0, 0, 0, 0.3)",
+                        backgroundColor: "rgba(255, 255, 255, 0.08)",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
+                        color: "#94a3b8",
                         flexShrink: 0,
                       }}
                     >
-                      {item.art_url ? (
-                        <img src={item.art_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                      ) : (
-                        <FaMusic size={16} color="#64748b" />
-                      )}
+                      <FaMusic size={14} />
                     </div>
+                  )}
 
-                    {/* Title & Artist */}
-                    <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
-                      <div
-                        style={{
-                          fontSize: "14px",
-                          fontWeight: 600,
-                          color: isCurrent ? "#60a5fa" : "#f8fafc",
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                        }}
-                      >
-                        {item.title}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: "12px",
-                          color: "#94a3b8",
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                        }}
-                      >
-                        {item.artist || t("unknownArtist")}
-                      </div>
+                  {/* Title & Artist */}
+                  <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
+                    <div
+                      style={{
+                        fontSize: "14px",
+                        fontWeight: 600,
+                        color: isPlaying ? "#60a5fa" : "#f8fafc",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      {item.title}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "12px",
+                        color: "#94a3b8",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      {item.artist || t("unknownArtist")}
                     </div>
                   </div>
 
-                  {/* Duration & Play icon */}
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
-                    <span style={{ fontSize: "12px", color: "#64748b" }}>
-                      {formatDuration(item.duration)}
-                    </span>
-                    {isLoadingThis ? (
-                      <FaSpinner className="spin" size={12} color="#60a5fa" />
-                    ) : isCurrent && isPlaying ? (
-                      <FaPause size={11} color="#60a5fa" />
-                    ) : (
-                      <FaPlay size={11} color={isCurrent ? "#60a5fa" : "#94a3b8"} />
-                    )}
+                  {/* Duration */}
+                  <div style={{ fontSize: "12px", color: "#64748b", minWidth: "40px", textAlign: "right", flexShrink: 0 }}>
+                    {formatDuration(item.duration)}
                   </div>
-                </DialogButton>
+                </Focusable>
               );
             })}
           </div>

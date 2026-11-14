@@ -3,6 +3,8 @@ import {
   PanelSection,
   PanelSectionRow,
   DialogButton,
+  Focusable,
+  Navigation,
   TextField,
 } from "@decky/ui";
 import {
@@ -11,14 +13,17 @@ import {
   FaHeart,
   FaListUl,
   FaChartLine,
-  FaKey,
+  FaExternalLinkAlt,
   FaSignOutAlt,
   FaSpinner,
   FaDownload,
+  FaCheck,
+  FaSync,
 } from "react-icons/fa";
 import { Track, PlayerStatus, YandexStatus, YandexPlaylist } from "../../types";
 import {
   rpcYandexGetStatus,
+  rpcYandexStartAuth,
   rpcYandexSetToken,
   rpcYandexGetPlaylists,
   rpcYandexGetPlaylistTracks,
@@ -28,6 +33,7 @@ import {
   rpcGetDownloadedInfo,
   rpcDownloadTrack,
 } from "../../api";
+import { openExternalAuthUrl } from "../../utils/browser";
 import { YandexMusicIcon } from "../YandexMusicIcon";
 import { useTranslation } from "../../i18n";
 
@@ -52,16 +58,15 @@ const formatDuration = (seconds?: number) => {
 export const YandexMusicTab: FC<YandexMusicTabProps> = ({ status, onRefresh }) => {
   const { t } = useTranslation();
   const [yandexStatus, setYandexStatus] = useState<YandexStatus>({ has_token: false, logged_in: false, user_name: "" });
-  const [tokenInput, setTokenInput] = useState("");
   const [playlists, setPlaylists] = useState<YandexPlaylist[]>(cachedYandexPlaylists);
   const [tracks, setTracks] = useState<Track[]>(cachedYandexTracks);
   const [selectedPlaylistId, setSelectedPlaylistId] = useState(cachedSelectedPlaylistId);
   const [selectedPlaylistName, setSelectedPlaylistName] = useState(cachedSelectedPlaylistName || t("chartTitle"));
   const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState("");
   const [statusMsg, setStatusMsg] = useState("");
   const [statusIsError, setStatusIsError] = useState(false);
   const [loadingTrackIdx, setLoadingTrackIdx] = useState<number | null>(null);
+  const [tokenInput, setTokenInput] = useState("");
 
   // Download state tracking
   const [downloadedIds, setDownloadedIds] = useState<Set<string>>(new Set());
@@ -194,21 +199,50 @@ export const YandexMusicTab: FC<YandexMusicTabProps> = ({ status, onRefresh }) =
     }
   };
 
-  const handleLogin = async () => {
-    if (!tokenInput.trim()) return;
+  const openBrowser = async () => {
+    if (yandexStatus.auth_url) {
+      await openExternalAuthUrl(yandexStatus.auth_url);
+    }
+  };
+  const handleOpenBrowser = openBrowser;
+
+  const handleRefreshCode = async () => {
     setLoading(true);
-    setMsg("");
     try {
-      const res = await rpcYandexSetToken(tokenInput.trim());
+      const res = await rpcYandexStartAuth(true);
       if (res && res.success) {
-        setTokenInput("");
-        setMsg(t("connectedAs", res.user));
-        await loadStatus();
-      } else {
-        setMsg(res?.error || t("downloadError", "Auth error"));
+        setYandexStatus((prev) => ({
+          ...prev,
+          user_code: res.user_code || "",
+          auth_url: res.auth_url || "",
+          qr_svg: res.qr_svg || "",
+        }));
       }
     } catch (e) {
-      setMsg(t("downloadError", "Failed to connect"));
+      console.error("Refresh Yandex code error:", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveToken = async () => {
+    let tVal = tokenInput.trim();
+    const m = tVal.match(/access_token[=:]+([^&\s#"']+)/);
+    if (m) tVal = m[1];
+    if (!tVal) return;
+    setLoading(true);
+    try {
+      const res = await rpcYandexSetToken(tVal);
+      if (res && res.success) {
+        setTokenInput("");
+        await loadStatus();
+      } else {
+        setStatusIsError(true);
+        setStatusMsg(res?.error || "Не удалось сохранить токен");
+        setTimeout(() => setStatusMsg(""), 4000);
+      }
+    } catch (e) {
+      console.error("Save Yandex token error:", e);
     } finally {
       setLoading(false);
     }
@@ -247,7 +281,28 @@ export const YandexMusicTab: FC<YandexMusicTabProps> = ({ status, onRefresh }) =
   useEffect(() => {
     loadStatus();
     loadDownloaded();
-  }, []);
+    const interval = setInterval(async () => {
+      if (!yandexStatus.logged_in) {
+        const s = await rpcYandexGetStatus();
+        if (s.logged_in) {
+          setYandexStatus(s);
+          loadPlaylists();
+          try {
+            if (typeof Navigation?.NavigateBack === "function") {
+              Navigation.NavigateBack();
+            }
+            const sc = (window as any).SteamClient;
+            if (typeof sc?.Overlay?.CloseOverlay === "function") {
+              sc.Overlay.CloseOverlay();
+            }
+          } catch (e) {}
+        } else if (s.user_code && s.user_code !== yandexStatus.user_code) {
+          setYandexStatus(s);
+        }
+      }
+    }, 1200);
+    return () => clearInterval(interval);
+  }, [yandexStatus.logged_in]);
 
   return (
     <div
@@ -270,86 +325,255 @@ export const YandexMusicTab: FC<YandexMusicTabProps> = ({ status, onRefresh }) =
         }
       `}</style>
 
-      <PanelSection title={t("yandexSectionTitle")}>
-        {/* Account Header */}
+      <PanelSection>
+        {/* Beta Notice Banner */}
         <PanelSectionRow>
           <div
             style={{
               display: "flex",
-              justifyContent: "space-between",
               alignItems: "center",
-              padding: "12px 16px",
-              backgroundColor: "rgba(0, 0, 0, 0.3)",
+              gap: "10px",
+              padding: "8px 14px",
+              backgroundColor: "rgba(234, 179, 8, 0.12)",
+              border: "1px solid rgba(234, 179, 8, 0.3)",
               borderRadius: "8px",
               marginBottom: "12px",
+              fontSize: "12px",
+              color: "#fef08a",
               width: "100%",
+              boxSizing: "border-box",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              <YandexMusicIcon size={24} />
-              <div>
-                {yandexStatus.logged_in ? (
-                  <div>
-                    <div style={{ fontSize: "14px", fontWeight: "bold", color: "#facc15" }}>
-                      {t("connectedAs", yandexStatus.user_name)}
-                    </div>
-                    <div style={{ fontSize: "11px", color: "#94a3b8" }}>
-                      {t("playlistsTitle")}
-                    </div>
-                  </div>
-                ) : (
-                  <div>
-                    <div style={{ fontSize: "14px", fontWeight: "bold", color: "#f8fafc" }}>
-                      {t("chartTitle")}
-                    </div>
-                    <div style={{ fontSize: "11px", color: "#94a3b8" }}>
-                      {t("authDesc")}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {yandexStatus.logged_in && (
-              <DialogButton
-                onClick={handleLogout}
-                style={{ minWidth: 0, padding: "6px 12px", backgroundColor: "rgba(239, 68, 68, 0.2)" }}
-              >
-                <FaSignOutAlt size={12} color="#f87171" />
-              </DialogButton>
-            )}
+            <span
+              style={{
+                backgroundColor: "#eab308",
+                color: "#000000",
+                fontWeight: 700,
+                fontSize: "10px",
+                padding: "2px 6px",
+                borderRadius: "4px",
+                letterSpacing: "0.5px",
+                flexShrink: 0,
+              }}
+            >
+              BETA
+            </span>
+            <span>{t("betaNotice")}</span>
           </div>
         </PanelSectionRow>
 
-        {/* Token Input if not logged in */}
-        {!yandexStatus.logged_in && (
+        {/* Account Header (Logged In Only) */}
+        {yandexStatus.logged_in && (
           <PanelSectionRow>
-            <div style={{ display: "flex", gap: "10px", width: "100%", marginBottom: "16px", alignItems: "center" }}>
-              <div style={{ flex: 1 }}>
-                <TextField
-                  label={t("tokenFieldLabel")}
-                  value={tokenInput}
-                  onChange={(e) => setTokenInput(e.target.value)}
-                />
-              </div>
-              <div style={{ width: "120px" }}>
-                <DialogButton
-                  disabled={loading || !tokenInput}
-                  onClick={handleLogin}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "6px",
-                    padding: "8px 0",
-                  }}
-                >
-                  <FaKey size={12} />
-                  <span>{loading ? t("searchingBtn") : t("loginBtn")}</span>
-                </DialogButton>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "10px 14px",
+                backgroundColor: "rgba(250, 204, 21, 0.12)",
+                borderRadius: "10px",
+                border: "1px solid rgba(250, 204, 21, 0.25)",
+                width: "100%",
+                boxSizing: "border-box",
+                marginBottom: "14px",
+                gap: "12px",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0, flex: 1 }}>
+                {yandexStatus.avatar ? (
+                  <img
+                    src={yandexStatus.avatar}
+                    alt="Avatar"
+                    style={{ width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: "36px",
+                      height: "36px",
+                      borderRadius: "50%",
+                      backgroundColor: "#facc15",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "#000",
+                      fontWeight: 700,
+                      flexShrink: 0,
+                    }}
+                  >
+                    Я
+                  </div>
+                )}
+                <div style={{ minWidth: 0, overflow: "hidden" }}>
+                  <div
+                    style={{
+                      fontSize: "14px",
+                      fontWeight: 600,
+                      color: "#f8fafc",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {yandexStatus.user_name}
+                  </div>
+                  {yandexStatus.user_id && (
+                    <div
+                      style={{
+                        fontSize: "11px",
+                        color: "#94a3b8",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      ID: {yandexStatus.user_id}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-            {msg && <div style={{ fontSize: "12px", color: "#facc15", marginTop: "4px" }}>{msg}</div>}
+          </PanelSectionRow>
+        )}
+
+        {/* Auth Container with Browser Button, QR Code, and Manual Token Input (Cassette method) */}
+        {!yandexStatus.logged_in && (
+          <PanelSectionRow>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "28px 16px",
+                textAlign: "center",
+                background: "linear-gradient(180deg, rgba(250, 204, 21, 0.15) 0%, rgba(18, 18, 18, 0.4) 100%)",
+                borderRadius: "12px",
+                border: "1px solid rgba(250, 204, 21, 0.3)",
+                margin: "8px 0 16px 0",
+                width: "100%",
+                boxSizing: "border-box",
+              }}
+            >
+              <div style={{ marginBottom: "14px" }}>
+                <YandexMusicIcon size={56} />
+              </div>
+              <div style={{ fontSize: "18px", fontWeight: "bold", color: "#f8fafc", marginBottom: "8px" }}>
+                {t("yandexAuthHeader")}
+              </div>
+              <div
+                style={{
+                  fontSize: "13px",
+                  color: "#94a3b8",
+                  maxWidth: "460px",
+                  lineHeight: "1.5",
+                  marginBottom: "20px",
+                  whiteSpace: "pre-line",
+                }}
+              >
+                {t("yandexInstructions")}
+              </div>
+
+              {/* Main Actions: Browser Button & QR Code */}
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "row",
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "20px",
+                  marginBottom: "20px",
+                  width: "100%",
+                }}
+              >
+                {/* QR Code Container */}
+                {yandexStatus.qr_svg && (
+                  <div
+                    style={{
+                      width: "150px",
+                      height: "150px",
+                      backgroundColor: "#ffffff",
+                      padding: "8px",
+                      borderRadius: "12px",
+                      boxSizing: "border-box",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      boxShadow: "0 6px 20px rgba(0, 0, 0, 0.4)",
+                    }}
+                  >
+                    <div
+                      dangerouslySetInnerHTML={{ __html: yandexStatus.qr_svg }}
+                      style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}
+                    />
+                  </div>
+                )}
+
+                {/* Right side: Browser Button */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px", minWidth: "200px", alignItems: "center" }}>
+                  <DialogButton
+                    className="deckymus-focus-btn"
+                    style={{
+                      width: "100%",
+                      padding: "14px 20px",
+                      backgroundColor: "#facc15",
+                      color: "#000000",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px",
+                      fontWeight: 700,
+                      borderRadius: "10px",
+                      fontSize: "14px",
+                    }}
+                    onClick={handleOpenBrowser}
+                  >
+                    <FaExternalLinkAlt size={15} />
+                    <span>{t("openInBrowser")}</span>
+                  </DialogButton>
+                  <div style={{ fontSize: "12px", color: "#64748b", textAlign: "center" }}>
+                    {t("scanQrWithPhone")}
+                  </div>
+                </div>
+              </div>
+
+              {/* Manual Token Input (Cassette method) */}
+              <div style={{ width: "100%", maxWidth: "460px", marginTop: "8px" }}>
+                <div style={{ fontSize: "12px", color: "#94a3b8", marginBottom: "6px", textAlign: "left" }}>
+                  {t("pasteTokenOrUrl")}
+                </div>
+                <Focusable flow-children="row" style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%" }}>
+                  <div style={{ flex: 1 }}>
+                    <TextField
+                      value={tokenInput}
+                      onChange={(e) => setTokenInput(e.target.value)}
+                      placeholder={t("tokenFieldPlaceholder") || "access_token или ссылка"}
+                    />
+                  </div>
+                  <DialogButton
+                    className="deckymus-focus-btn"
+                    style={{
+                      minWidth: "40px",
+                      width: "40px",
+                      height: "40px",
+                      padding: "0",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      backgroundColor: "#22c55e",
+                      color: "#ffffff",
+                      borderRadius: "8px",
+                      flexShrink: 0,
+                    }}
+                    onClick={handleSaveToken}
+                  >
+                    <FaCheck size={14} />
+                  </DialogButton>
+                </Focusable>
+              </div>
+            </div>
           </PanelSectionRow>
         )}
 
@@ -380,8 +604,9 @@ export const YandexMusicTab: FC<YandexMusicTabProps> = ({ status, onRefresh }) =
 
         {/* Playlist Selector Buttons */}
         <PanelSectionRow>
-          <div style={{ display: "flex", gap: "8px", overflowX: "auto", paddingBottom: "8px", width: "100%" }}>
+          <Focusable flow-children="row" style={{ display: "flex", gap: "8px", overflowX: "auto", paddingBottom: "8px", width: "100%" }}>
             <DialogButton
+              className="deckymus-focus-btn"
               onClick={loadChart}
               style={{
                 minWidth: "auto",
@@ -398,6 +623,7 @@ export const YandexMusicTab: FC<YandexMusicTabProps> = ({ status, onRefresh }) =
             {playlists.map((pl) => (
               <DialogButton
                 key={pl.id}
+                className="deckymus-focus-btn"
                 onClick={() => loadPlaylistTracks(pl.id, pl.owner_id || "", pl.title)}
                 style={{
                   minWidth: "auto",
@@ -415,12 +641,12 @@ export const YandexMusicTab: FC<YandexMusicTabProps> = ({ status, onRefresh }) =
                 {pl.title} ({pl.track_count})
               </DialogButton>
             ))}
-          </div>
+          </Focusable>
         </PanelSectionRow>
 
         {/* Tracks List */}
         <PanelSectionRow>
-          <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "6px" }}>
+          <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "6px", padding: "4px 6px", boxSizing: "border-box" }}>
             <div style={{ fontSize: "13px", fontWeight: "bold", color: "#f8fafc", marginBottom: "6px" }}>
               {selectedPlaylistId === "chart" ? t("chartTitle") : selectedPlaylistName} ({tracks.length})
             </div>
@@ -433,144 +659,164 @@ export const YandexMusicTab: FC<YandexMusicTabProps> = ({ status, onRefresh }) =
 
             {!loading && tracks.map((t, idx) => {
               const isCurrent = (t.id && status.track?.id === t.id) || (t.path && status.track?.path === t.path);
-              const isPlaying = status.playback_status === "Playing";
+              const isPlaying = isCurrent && status.playback_status === "Playing";
+              const isCurrentPaused = isCurrent && status.playback_status === "Paused";
               const isLoadingThis = loadingTrackIdx === idx;
               const isDown = isDownloaded(t);
               const isDowning = downloadingIds.has(String(t.id));
 
               return (
-                <div
+                <Focusable
                   key={t.id || idx}
+                  flow-children="row"
                   style={{
                     display: "flex",
                     alignItems: "center",
                     gap: "6px",
                     width: "100%",
-                    minWidth: 0,
-                    maxWidth: "100%",
                     boxSizing: "border-box",
-                    marginBottom: "4px",
-                    overflow: "hidden",
                   }}
                 >
-                  {/* Track Play Button */}
-                  <DialogButton
-                    onClick={() => handlePlayTrack(idx)}
+                  {/* Track Play Button (Left) */}
+                  <Focusable
+                    className="deckymus-focus-btn"
+                    onActivate={() => {
+                      if (isPlaying) {
+                        rpcPlayPause().then(onRefresh);
+                      } else if (isCurrentPaused) {
+                        rpcPlayPause().then(onRefresh);
+                      } else {
+                        handlePlayTrack(idx);
+                      }
+                    }}
                     style={{
-                      flex: "1 1 0%",
+                      flex: 1,
                       minWidth: 0,
-                      maxWidth: !isDown ? "calc(100% - 44px)" : "100%",
-                      boxSizing: "border-box",
                       display: "flex",
                       alignItems: "center",
-                      justifyContent: "space-between",
                       padding: "8px 12px",
-                      backgroundColor: isCurrent ? "rgba(250, 204, 21, 0.25)" : "rgba(255, 255, 255, 0.04)",
-                      border: isCurrent ? "1px solid rgba(250, 204, 21, 0.6)" : "1px solid transparent",
-                      textAlign: "left",
-                      overflow: "hidden",
+                      backgroundColor: isPlaying
+                        ? "rgba(250, 204, 21, 0.2)"
+                        : "rgba(255, 255, 255, 0.03)",
+                      border: isPlaying ? "1px solid #facc15" : "1px solid rgba(255, 255, 255, 0.06)",
+                      borderRadius: "8px",
+                      gap: "10px",
+                      cursor: "pointer",
                     }}
                   >
+                    {/* Play / Pause indicator icon */}
                     <div
                       style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "10px",
-                        minWidth: 0,
-                        flex: "1 1 0%",
-                        overflow: "hidden",
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: "42px",
-                          height: "42px",
-                          borderRadius: "6px",
-                          overflow: "hidden",
-                          backgroundColor: "rgba(0, 0, 0, 0.3)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
-                        }}
-                      >
-                        {t.art_url ? (
-                          <img src={t.art_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                        ) : (
-                          <YandexMusicIcon size={20} />
-                        )}
-                      </div>
-
-                      <div style={{ flex: "1 1 0%", minWidth: 0, overflow: "hidden" }}>
-                        <div
-                          style={{
-                            fontSize: "13px",
-                            fontWeight: 600,
-                            color: isCurrent ? "#facc15" : "#f8fafc",
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                          }}
-                        >
-                          {t.title}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: "11px",
-                            color: "#94a3b8",
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                          }}
-                        >
-                          {t.artist}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0, marginLeft: "8px" }}>
-                      <span style={{ fontSize: "11px", color: "#64748b" }}>
-                        {formatDuration(t.duration)}
-                      </span>
-                      {isLoadingThis ? (
-                        <FaSpinner className="deckymus-spin" size={12} color="#facc15" />
-                      ) : isCurrent && isPlaying ? (
-                        <FaPause size={11} color="#facc15" />
-                      ) : (
-                        <FaPlay size={11} color={isCurrent ? "#facc15" : "#94a3b8"} />
-                      )}
-                    </div>
-                  </DialogButton>
-
-                  {/* Download Button (Only visible if track is NOT yet downloaded) */}
-                  {!isDown && (
-                    <DialogButton
-                      disabled={isDowning}
-                      onClick={() => handleDownload(t)}
-                      style={{
-                        minWidth: "38px",
-                        maxWidth: "38px",
-                        width: "38px",
-                        height: "38px",
-                        padding: 0,
+                        minWidth: "36px",
+                        width: "36px",
+                        height: "36px",
+                        borderRadius: "50%",
+                        backgroundColor: isPlaying ? "#facc15" : "rgba(255, 255, 255, 0.1)",
+                        color: isPlaying ? "#000" : "#fff",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        backgroundColor: isDowning ? "rgba(59, 130, 246, 0.35)" : "rgba(255, 255, 255, 0.06)",
-                        border: "1px solid rgba(255, 255, 255, 0.1)",
-                        borderRadius: "6px",
                         flexShrink: 0,
-                        boxSizing: "border-box",
                       }}
                     >
-                      {isDowning ? (
-                        <FaSpinner className="deckymus-spin" size={13} color="#60a5fa" />
+                      {isLoadingThis ? (
+                        <FaSpinner className="spin" size={12} />
+                      ) : isPlaying ? (
+                        <FaPause size={12} />
                       ) : (
-                        <FaDownload size={12} color="#94a3b8" />
+                        <FaPlay size={12} style={{ marginLeft: "2px" }} />
                       )}
-                    </DialogButton>
-                  )}
-                </div>
+                    </div>
+
+                    {/* Cover */}
+                    {t.art_url ? (
+                      <img
+                        src={t.art_url}
+                        alt=""
+                        style={{ width: "38px", height: "38px", borderRadius: "6px", objectFit: "cover", flexShrink: 0 }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: "38px",
+                          height: "38px",
+                          borderRadius: "6px",
+                          backgroundColor: "rgba(255, 255, 255, 0.08)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          color: "#facc15",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <YandexMusicIcon size={20} />
+                      </div>
+                    )}
+
+                    {/* Metadata */}
+                    <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
+                      <div
+                        style={{
+                          fontSize: "14px",
+                          fontWeight: 600,
+                          color: isPlaying ? "#facc15" : "#f8fafc",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                      >
+                        {t.title}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "12px",
+                          color: "#94a3b8",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                      >
+                        {t.artist}
+                      </div>
+                    </div>
+
+                    {/* Duration */}
+                    <div style={{ fontSize: "12px", color: "#64748b", minWidth: "40px", textAlign: "right", flexShrink: 0 }}>
+                      {formatDuration(t.duration)}
+                    </div>
+                  </Focusable>
+
+                  {/* Download Button (Right) */}
+                  <DialogButton
+                    className="deckymus-focus-btn"
+                    style={{
+                      minWidth: "36px",
+                      width: "36px",
+                      height: "44px",
+                      padding: "0",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      borderRadius: "8px",
+                      backgroundColor: isDown
+                        ? "rgba(34, 197, 94, 0.2)"
+                        : "rgba(255, 255, 255, 0.06)",
+                      border: isDown ? "1px solid rgba(34, 197, 94, 0.4)" : "1px solid rgba(255, 255, 255, 0.08)",
+                      color: isDown ? "#4ade80" : "#cbd5e1",
+                      flexShrink: 0,
+                    }}
+                    disabled={isDowning}
+                    onClick={() => handleDownload(t)}
+                  >
+                    {isDowning ? (
+                      <FaSpinner className="spin" size={12} />
+                    ) : isDown ? (
+                      <FaCheck size={12} />
+                    ) : (
+                      <FaDownload size={12} />
+                    )}
+                  </DialogButton>
+                </Focusable>
               );
             })}
           </div>

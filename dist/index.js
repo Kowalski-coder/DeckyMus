@@ -47,10 +47,29 @@ const rpcScanLocalMusic = callable("scan_local_music");
 const rpcBrowseDirectory = callable("browse_directory");
 // Yandex Music
 const rpcYandexSetToken = callable("yandex_set_token");
+const rpcYandexLogout = callable("yandex_logout");
+callable("yandex_start_auth");
 const rpcYandexGetStatus = callable("yandex_get_status");
 const rpcYandexGetPlaylists = callable("yandex_get_playlists");
 const rpcYandexGetPlaylistTracks = callable("yandex_get_playlist_tracks");
 const rpcYandexGetChart = callable("yandex_get_chart");
+// VK Музыка
+const rpcVkGetStatus = callable("vk_get_status");
+callable("vk_set_token");
+const rpcVkLogout = callable("vk_logout");
+const rpcVkGetMyMusic = callable("vk_get_my_music");
+const rpcVkGetPlaylists = callable("vk_get_playlists");
+const rpcVkGetPlaylistTracks = callable("vk_get_playlist_tracks");
+const rpcVkSearch = callable("vk_search");
+// Spotify
+const rpcSpotifyGetStatus = callable("spotify_get_status");
+callable("spotify_set_credentials");
+callable("spotify_set_token");
+const rpcSpotifyLogout = callable("spotify_logout");
+const rpcSpotifyGetPlaylists = callable("spotify_get_playlists");
+const rpcSpotifyGetPlaylistTracks = callable("spotify_get_playlist_tracks");
+const rpcSpotifyGetLikedTracks = callable("spotify_get_liked_tracks");
+const rpcSpotifySearch = callable("spotify_search");
 // YouTube Music
 const rpcYtSearch = callable("yt_search");
 // Downloads & Offline Storage
@@ -58,6 +77,8 @@ const rpcGetDownloadFolder = callable("get_download_folder");
 const rpcSetDownloadFolder = callable("set_download_folder");
 const rpcGetDownloadedInfo = callable("get_downloaded_info");
 const rpcDownloadTrack = callable("download_track");
+// Browser Opener
+const rpcOpenBrowser = callable("open_browser");
 
 const DeckyMusIcon = ({ size = 18 }) => {
     return (SP_JSX.jsx("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "currentColor", xmlns: "http://www.w3.org/2000/svg", style: { display: "inline-block", verticalAlign: "middle" }, children: SP_JSX.jsx("path", { d: "M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" }) }));
@@ -157,8 +178,6 @@ function FaYoutube (props) {
   return GenIcon({"attr":{"viewBox":"0 0 512 512"},"child":[{"tag":"path","attr":{"d":"M48 48a48 48 0 1 0 48 48 48 48 0 0 0-48-48zm0 160a48 48 0 1 0 48 48 48 48 0 0 0-48-48zm0 160a48 48 0 1 0 48 48 48 48 0 0 0-48-48zm448 16H176a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h320a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm0-320H176a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h320a16 16 0 0 0 16-16V80a16 16 0 0 0-16-16zm0 160H176a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h320a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16z"},"child":[]}]})(props);
 }function FaLevelUpAlt (props) {
   return GenIcon({"attr":{"viewBox":"0 0 320 512"},"child":[{"tag":"path","attr":{"d":"M313.553 119.669L209.587 7.666c-9.485-10.214-25.676-10.229-35.174 0L70.438 119.669C56.232 134.969 67.062 160 88.025 160H152v272H68.024a11.996 11.996 0 0 0-8.485 3.515l-56 56C-4.021 499.074 1.333 512 12.024 512H208c13.255 0 24-10.745 24-24V160h63.966c20.878 0 31.851-24.969 17.587-40.331z"},"child":[]}]})(props);
-}function FaKey (props) {
-  return GenIcon({"attr":{"viewBox":"0 0 512 512"},"child":[{"tag":"path","attr":{"d":"M512 176.001C512 273.203 433.202 352 336 352c-11.22 0-22.19-1.062-32.827-3.069l-24.012 27.014A23.999 23.999 0 0 1 261.223 384H224v40c0 13.255-10.745 24-24 24h-40v40c0 13.255-10.745 24-24 24H24c-13.255 0-24-10.745-24-24v-78.059c0-6.365 2.529-12.47 7.029-16.971l161.802-161.802C163.108 213.814 160 195.271 160 176 160 78.798 238.797.001 335.999 0 433.488-.001 512 78.511 512 176.001zM336 128c0 26.51 21.49 48 48 48s48-21.49 48-48-21.49-48-48-48-48 21.49-48 48z"},"child":[]}]})(props);
 }function FaHeart (props) {
   return GenIcon({"attr":{"viewBox":"0 0 512 512"},"child":[{"tag":"path","attr":{"d":"M462.3 62.6C407.5 15.9 326 24.3 275.7 76.2L256 96.5l-19.7-20.3C186.1 24.3 104.5 15.9 49.7 62.6c-62.8 53.6-66.1 149.8-9.9 207.9l193.5 199.8c12.5 12.9 32.8 12.9 45.3 0l193.5-199.8c56.3-58.1 53-154.3-9.8-207.9z"},"child":[]}]})(props);
 }function FaHeadphones (props) {
@@ -171,6 +190,8 @@ function FaYoutube (props) {
   return GenIcon({"attr":{"viewBox":"0 0 512 512"},"child":[{"tag":"path","attr":{"d":"M464 128H272l-64-64H48C21.49 64 0 85.49 0 112v288c0 26.51 21.49 48 48 48h416c26.51 0 48-21.49 48-48V176c0-26.51-21.49-48-48-48z"},"child":[]}]})(props);
 }function FaFolderOpen (props) {
   return GenIcon({"attr":{"viewBox":"0 0 576 512"},"child":[{"tag":"path","attr":{"d":"M572.694 292.093L500.27 416.248A63.997 63.997 0 0 1 444.989 448H45.025c-18.523 0-30.064-20.093-20.731-36.093l72.424-124.155A64 64 0 0 1 152 256h399.964c18.523 0 30.064 20.093 20.73 36.093zM152 224h328v-48c0-26.51-21.49-48-48-48H272l-64-64H48C21.49 64 0 85.49 0 112v278.046l69.077-118.418C86.214 242.25 117.989 224 152 224z"},"child":[]}]})(props);
+}function FaExternalLinkAlt (props) {
+  return GenIcon({"attr":{"viewBox":"0 0 512 512"},"child":[{"tag":"path","attr":{"d":"M432,320H400a16,16,0,0,0-16,16V448H64V128H208a16,16,0,0,0,16-16V80a16,16,0,0,0-16-16H48A48,48,0,0,0,0,112V464a48,48,0,0,0,48,48H400a48,48,0,0,0,48-48V336A16,16,0,0,0,432,320ZM488,0h-128c-21.37,0-32.05,25.91-17,41l35.73,35.73L135,320.37a24,24,0,0,0,0,34L157.67,377a24,24,0,0,0,34,0L435.28,133.32,471,169c15,15,41,4.5,41-17V24A24,24,0,0,0,488,0Z"},"child":[]}]})(props);
 }function FaExpandAlt (props) {
   return GenIcon({"attr":{"viewBox":"0 0 448 512"},"child":[{"tag":"path","attr":{"d":"M212.686 315.314L120 408l32.922 31.029c15.12 15.12 4.412 40.971-16.97 40.971h-112C10.697 480 0 469.255 0 456V344c0-21.382 25.803-32.09 40.922-16.971L72 360l92.686-92.686c6.248-6.248 16.379-6.248 22.627 0l25.373 25.373c6.249 6.248 6.249 16.378 0 22.627zm22.628-118.628L328 104l-32.922-31.029C279.958 57.851 290.666 32 312.048 32h112C437.303 32 448 42.745 448 56v112c0 21.382-25.803 32.09-40.922 16.971L376 152l-92.686 92.686c-6.248 6.248-16.379 6.248-22.627 0l-25.373-25.373c-6.249-6.248-6.249-16.378 0-22.627z"},"child":[]}]})(props);
 }function FaDownload (props) {
@@ -185,6 +206,8 @@ function FaYoutube (props) {
   return GenIcon({"attr":{"viewBox":"0 0 512 512"},"child":[{"tag":"path","attr":{"d":"M496 384H64V80c0-8.84-7.16-16-16-16H16C7.16 64 0 71.16 0 80v336c0 17.67 14.33 32 32 32h464c8.84 0 16-7.16 16-16v-32c0-8.84-7.16-16-16-16zM464 96H345.94c-21.38 0-32.09 25.85-16.97 40.97l32.4 32.4L288 242.75l-73.37-73.37c-12.5-12.5-32.76-12.5-45.25 0l-68.69 68.69c-6.25 6.25-6.25 16.38 0 22.63l22.62 22.62c6.25 6.25 16.38 6.25 22.63 0L192 237.25l73.37 73.37c12.5 12.5 32.76 12.5 45.25 0l96-96 32.4 32.4c15.12 15.12 40.97 4.41 40.97-16.97V112c.01-8.84-7.15-16-15.99-16z"},"child":[]}]})(props);
 }function FaBackward (props) {
   return GenIcon({"attr":{"viewBox":"0 0 512 512"},"child":[{"tag":"path","attr":{"d":"M11.5 280.6l192 160c20.6 17.2 52.5 2.8 52.5-24.6V96c0-27.4-31.9-41.8-52.5-24.6l-192 160c-15.3 12.8-15.3 36.4 0 49.2zm256 0l192 160c20.6 17.2 52.5 2.8 52.5-24.6V96c0-27.4-31.9-41.8-52.5-24.6l-192 160c-15.3 12.8-15.3 36.4 0 49.2z"},"child":[]}]})(props);
+}function FaArrowLeft (props) {
+  return GenIcon({"attr":{"viewBox":"0 0 448 512"},"child":[{"tag":"path","attr":{"d":"M257.5 445.1l-22.2 22.2c-9.4 9.4-24.6 9.4-33.9 0L7 273c-9.4-9.4-9.4-24.6 0-33.9L201.4 44.7c9.4-9.4 24.6-9.4 33.9 0l22.2 22.2c9.5 9.5 9.3 25-.4 34.3L136.6 216H424c13.3 0 24 10.7 24 24v32c0 13.3-10.7 24-24 24H136.6l120.5 114.8c9.8 9.3 10 24.8.4 34.3z"},"child":[]}]})(props);
 }
 
 const translations = {
@@ -294,7 +317,35 @@ const translations = {
         "techAudioEngine": "Аудиодвижок:",
         "techInterface": "Интерфейс:",
         "techConversion": "Конвертация аудио:",
-        "techCreatedFor": "Создано для Decky Loader Россия (deckyloader.ru)"
+        "techCreatedFor": "Создано для Decky Loader Россия (deckyloader.ru)",
+        "tabSpotify": "Spotify",
+        "sourceSpotify": "Spotify",
+        "spotifySectionTitle": "Spotify",
+        "myMusic": "Моя музыка",
+        "myPlaylists": "Мои плейлисты",
+        "likedTracks": "Любимые треки",
+        "openInBrowser": "Открыть в браузере",
+        "scanQrWithPhone": "Отсканируйте камерой смартфона:",
+        "pasteTokenOrUrl": "Или вставьте токен / URL переадресации:",
+        "tokenFieldPlaceholder": "Токен или ссылка из адресной строки",
+        "vkInstructions": "1. Нажмите «Открыть в браузере».\n2. Нажмите «Разрешить» на открывшейся странице ВКонтакте.\n3. Вход в аккаунт произойдет автоматически.",
+        "betaNotice": "Бета-версия: данный раздел может работать некорректно.",
+        "spotifyInstructions": "1. Нажмите «Открыть в браузере» или отсканируйте QR-код для входа через Spotify.\n2. Также можно указать Client ID и Client Secret из Spotify Developer Dashboard.",
+        "spotifyClientId": "Spotify Client ID",
+        "spotifyClientSecret": "Spotify Client Secret",
+        "spotifySaveCredentials": "Сохранить ключи",
+        "spotifyAuthWithCredentials": "Войти с ключами",
+        "noPlaylistsFound": "Плейлисты не найдены",
+        "noTracksFound": "Треки не найдены",
+        "backToPlaylists": "← К плейлистам",
+        "trackCount": "{0} треков",
+        "searchResults": "Результаты поиска",
+        "searchVkPlaceholder": "Поиск треков в VK Музыке",
+        "searchSpotifyPlaceholder": "Поиск треков в Spotify",
+        "vkAuthHeader": "Авторизация VK Музыка",
+        "spotifyAuthHeader": "Авторизация Spotify",
+        "featSpotifyTitle": "Spotify",
+        "featSpotifyDesc": "Полноценный поиск, прослушивание и скачивание треков и плейлистов из Spotify."
     },
     "en": {
         "tabPlayer": "Player",
@@ -402,7 +453,35 @@ const translations = {
         "techAudioEngine": "Audio Engine:",
         "techInterface": "User Interface:",
         "techConversion": "Audio Conversion:",
-        "techCreatedFor": "Created for Decky Loader Russia (deckyloader.ru)"
+        "techCreatedFor": "Created for Decky Loader Russia (deckyloader.ru)",
+        "tabSpotify": "Spotify",
+        "sourceSpotify": "Spotify",
+        "spotifySectionTitle": "Spotify",
+        "myMusic": "My Music",
+        "myPlaylists": "My Playlists",
+        "likedTracks": "Liked Songs",
+        "openInBrowser": "Open in Browser",
+        "scanQrWithPhone": "Scan with your phone camera:",
+        "pasteTokenOrUrl": "Or paste token / redirect URL:",
+        "tokenFieldPlaceholder": "Token or address bar URL",
+        "vkInstructions": "1. Click 'Open in Browser'.\n2. Click 'Allow' on the VK page.\n3. Login will complete automatically.",
+        "betaNotice": "Beta version: this section may work incorrectly.",
+        "spotifyInstructions": "1. Click 'Open in Browser' or scan the QR code to authenticate with Spotify.\n2. Or enter your Client ID and Client Secret from Spotify Developer Dashboard.",
+        "spotifyClientId": "Spotify Client ID",
+        "spotifyClientSecret": "Spotify Client Secret",
+        "spotifySaveCredentials": "Save Credentials",
+        "spotifyAuthWithCredentials": "Log In with Credentials",
+        "noPlaylistsFound": "No playlists found",
+        "noTracksFound": "No tracks found",
+        "backToPlaylists": "← Back to playlists",
+        "trackCount": "{0} tracks",
+        "searchResults": "Search Results",
+        "searchVkPlaceholder": "Search tracks in VK Music",
+        "searchSpotifyPlaceholder": "Search tracks in Spotify",
+        "vkAuthHeader": "VK Music Authorization",
+        "spotifyAuthHeader": "Spotify Authorization",
+        "featSpotifyTitle": "Spotify",
+        "featSpotifyDesc": "Search, playback and download tracks and playlists from Spotify."
     },
     "de": {
         "tabPlayer": "Player",
@@ -2022,7 +2101,35 @@ const translations = {
         "techAudioEngine": "Audio Engine:",
         "techInterface": "User Interface:",
         "techConversion": "Audio Conversion:",
-        "techCreatedFor": "Created for Decky Loader Russia (deckyloader.ru)"
+        "techCreatedFor": "Created for Decky Loader Russia (deckyloader.ru)",
+        "tabSpotify": "Spotify",
+        "sourceSpotify": "Spotify",
+        "spotifySectionTitle": "Spotify",
+        "myMusic": "My Music",
+        "myPlaylists": "My Playlists",
+        "likedTracks": "Liked Songs",
+        "openInBrowser": "Open in Browser",
+        "scanQrWithPhone": "Scan with your phone camera:",
+        "pasteTokenOrUrl": "Or paste token / redirect URL:",
+        "tokenFieldPlaceholder": "Token or address bar URL",
+        "vkInstructions": "1. Click 'Open in Browser'.\n2. Click 'Allow' on the VK page.\n3. Login will complete automatically.",
+        "betaNotice": "Beta version: this section may work incorrectly.",
+        "spotifyInstructions": "1. Click 'Open in Browser' or scan the QR code to authenticate with Spotify.\n2. Or enter your Client ID and Client Secret from Spotify Developer Dashboard.",
+        "spotifyClientId": "Spotify Client ID",
+        "spotifyClientSecret": "Spotify Client Secret",
+        "spotifySaveCredentials": "Save Credentials",
+        "spotifyAuthWithCredentials": "Log In with Credentials",
+        "noPlaylistsFound": "No playlists found",
+        "noTracksFound": "No tracks found",
+        "backToPlaylists": "← Back to playlists",
+        "trackCount": "{0} tracks",
+        "searchResults": "Search Results",
+        "searchVkPlaceholder": "Search tracks in VK Music",
+        "searchSpotifyPlaceholder": "Search tracks in Spotify",
+        "vkAuthHeader": "VK Music Authorization",
+        "spotifyAuthHeader": "Spotify Authorization",
+        "featSpotifyTitle": "Spotify",
+        "featSpotifyDesc": "Search, playback and download tracks and playlists from Spotify."
     },
     "da": {
         "tabPlayer": "Afspiller",
@@ -2130,7 +2237,35 @@ const translations = {
         "techAudioEngine": "Audio Engine:",
         "techInterface": "User Interface:",
         "techConversion": "Audio Conversion:",
-        "techCreatedFor": "Created for Decky Loader Russia (deckyloader.ru)"
+        "techCreatedFor": "Created for Decky Loader Russia (deckyloader.ru)",
+        "tabSpotify": "Spotify",
+        "sourceSpotify": "Spotify",
+        "spotifySectionTitle": "Spotify",
+        "myMusic": "My Music",
+        "myPlaylists": "My Playlists",
+        "likedTracks": "Liked Songs",
+        "openInBrowser": "Open in Browser",
+        "scanQrWithPhone": "Scan with your phone camera:",
+        "pasteTokenOrUrl": "Or paste token / redirect URL:",
+        "tokenFieldPlaceholder": "Token or address bar URL",
+        "vkInstructions": "1. Click 'Open in Browser'.\n2. Click 'Allow' on the VK page.\n3. Login will complete automatically.",
+        "betaNotice": "Beta version: this section may work incorrectly.",
+        "spotifyInstructions": "1. Click 'Open in Browser' or scan the QR code to authenticate with Spotify.\n2. Or enter your Client ID and Client Secret from Spotify Developer Dashboard.",
+        "spotifyClientId": "Spotify Client ID",
+        "spotifyClientSecret": "Spotify Client Secret",
+        "spotifySaveCredentials": "Save Credentials",
+        "spotifyAuthWithCredentials": "Log In with Credentials",
+        "noPlaylistsFound": "No playlists found",
+        "noTracksFound": "No tracks found",
+        "backToPlaylists": "← Back to playlists",
+        "trackCount": "{0} tracks",
+        "searchResults": "Search Results",
+        "searchVkPlaceholder": "Search tracks in VK Music",
+        "searchSpotifyPlaceholder": "Search tracks in Spotify",
+        "vkAuthHeader": "VK Music Authorization",
+        "spotifyAuthHeader": "Spotify Authorization",
+        "featSpotifyTitle": "Spotify",
+        "featSpotifyDesc": "Search, playback and download tracks and playlists from Spotify."
     },
     "nl": {
         "tabPlayer": "Speler",
@@ -2238,7 +2373,35 @@ const translations = {
         "techAudioEngine": "Audio Engine:",
         "techInterface": "User Interface:",
         "techConversion": "Audio Conversion:",
-        "techCreatedFor": "Created for Decky Loader Russia (deckyloader.ru)"
+        "techCreatedFor": "Created for Decky Loader Russia (deckyloader.ru)",
+        "tabSpotify": "Spotify",
+        "sourceSpotify": "Spotify",
+        "spotifySectionTitle": "Spotify",
+        "myMusic": "My Music",
+        "myPlaylists": "My Playlists",
+        "likedTracks": "Liked Songs",
+        "openInBrowser": "Open in Browser",
+        "scanQrWithPhone": "Scan with your phone camera:",
+        "pasteTokenOrUrl": "Or paste token / redirect URL:",
+        "tokenFieldPlaceholder": "Token or address bar URL",
+        "vkInstructions": "1. Click 'Open in Browser'.\n2. Click 'Allow' on the VK page.\n3. Login will complete automatically.",
+        "betaNotice": "Beta version: this section may work incorrectly.",
+        "spotifyInstructions": "1. Click 'Open in Browser' or scan the QR code to authenticate with Spotify.\n2. Or enter your Client ID and Client Secret from Spotify Developer Dashboard.",
+        "spotifyClientId": "Spotify Client ID",
+        "spotifyClientSecret": "Spotify Client Secret",
+        "spotifySaveCredentials": "Save Credentials",
+        "spotifyAuthWithCredentials": "Log In with Credentials",
+        "noPlaylistsFound": "No playlists found",
+        "noTracksFound": "No tracks found",
+        "backToPlaylists": "← Back to playlists",
+        "trackCount": "{0} tracks",
+        "searchResults": "Search Results",
+        "searchVkPlaceholder": "Search tracks in VK Music",
+        "searchSpotifyPlaceholder": "Search tracks in Spotify",
+        "vkAuthHeader": "VK Music Authorization",
+        "spotifyAuthHeader": "Spotify Authorization",
+        "featSpotifyTitle": "Spotify",
+        "featSpotifyDesc": "Search, playback and download tracks and playlists from Spotify."
     },
     "fi": {
         "tabPlayer": "Soitin",
@@ -2346,7 +2509,35 @@ const translations = {
         "techAudioEngine": "Audio Engine:",
         "techInterface": "User Interface:",
         "techConversion": "Audio Conversion:",
-        "techCreatedFor": "Created for Decky Loader Russia (deckyloader.ru)"
+        "techCreatedFor": "Created for Decky Loader Russia (deckyloader.ru)",
+        "tabSpotify": "Spotify",
+        "sourceSpotify": "Spotify",
+        "spotifySectionTitle": "Spotify",
+        "myMusic": "My Music",
+        "myPlaylists": "My Playlists",
+        "likedTracks": "Liked Songs",
+        "openInBrowser": "Open in Browser",
+        "scanQrWithPhone": "Scan with your phone camera:",
+        "pasteTokenOrUrl": "Or paste token / redirect URL:",
+        "tokenFieldPlaceholder": "Token or address bar URL",
+        "vkInstructions": "1. Click 'Open in Browser'.\n2. Click 'Allow' on the VK page.\n3. Login will complete automatically.",
+        "betaNotice": "Beta version: this section may work incorrectly.",
+        "spotifyInstructions": "1. Click 'Open in Browser' or scan the QR code to authenticate with Spotify.\n2. Or enter your Client ID and Client Secret from Spotify Developer Dashboard.",
+        "spotifyClientId": "Spotify Client ID",
+        "spotifyClientSecret": "Spotify Client Secret",
+        "spotifySaveCredentials": "Save Credentials",
+        "spotifyAuthWithCredentials": "Log In with Credentials",
+        "noPlaylistsFound": "No playlists found",
+        "noTracksFound": "No tracks found",
+        "backToPlaylists": "← Back to playlists",
+        "trackCount": "{0} tracks",
+        "searchResults": "Search Results",
+        "searchVkPlaceholder": "Search tracks in VK Music",
+        "searchSpotifyPlaceholder": "Search tracks in Spotify",
+        "vkAuthHeader": "VK Music Authorization",
+        "spotifyAuthHeader": "Spotify Authorization",
+        "featSpotifyTitle": "Spotify",
+        "featSpotifyDesc": "Search, playback and download tracks and playlists from Spotify."
     },
     "el": {
         "tabPlayer": "Αναπαραγωγή",
@@ -2454,7 +2645,35 @@ const translations = {
         "techAudioEngine": "Audio Engine:",
         "techInterface": "User Interface:",
         "techConversion": "Audio Conversion:",
-        "techCreatedFor": "Created for Decky Loader Russia (deckyloader.ru)"
+        "techCreatedFor": "Created for Decky Loader Russia (deckyloader.ru)",
+        "tabSpotify": "Spotify",
+        "sourceSpotify": "Spotify",
+        "spotifySectionTitle": "Spotify",
+        "myMusic": "My Music",
+        "myPlaylists": "My Playlists",
+        "likedTracks": "Liked Songs",
+        "openInBrowser": "Open in Browser",
+        "scanQrWithPhone": "Scan with your phone camera:",
+        "pasteTokenOrUrl": "Or paste token / redirect URL:",
+        "tokenFieldPlaceholder": "Token or address bar URL",
+        "vkInstructions": "1. Click 'Open in Browser'.\n2. Click 'Allow' on the VK page.\n3. Login will complete automatically.",
+        "betaNotice": "Beta version: this section may work incorrectly.",
+        "spotifyInstructions": "1. Click 'Open in Browser' or scan the QR code to authenticate with Spotify.\n2. Or enter your Client ID and Client Secret from Spotify Developer Dashboard.",
+        "spotifyClientId": "Spotify Client ID",
+        "spotifyClientSecret": "Spotify Client Secret",
+        "spotifySaveCredentials": "Save Credentials",
+        "spotifyAuthWithCredentials": "Log In with Credentials",
+        "noPlaylistsFound": "No playlists found",
+        "noTracksFound": "No tracks found",
+        "backToPlaylists": "← Back to playlists",
+        "trackCount": "{0} tracks",
+        "searchResults": "Search Results",
+        "searchVkPlaceholder": "Search tracks in VK Music",
+        "searchSpotifyPlaceholder": "Search tracks in Spotify",
+        "vkAuthHeader": "VK Music Authorization",
+        "spotifyAuthHeader": "Spotify Authorization",
+        "featSpotifyTitle": "Spotify",
+        "featSpotifyDesc": "Search, playback and download tracks and playlists from Spotify."
     },
     "hu": {
         "tabPlayer": "Lejátszó",
@@ -2562,7 +2781,35 @@ const translations = {
         "techAudioEngine": "Audio Engine:",
         "techInterface": "User Interface:",
         "techConversion": "Audio Conversion:",
-        "techCreatedFor": "Created for Decky Loader Russia (deckyloader.ru)"
+        "techCreatedFor": "Created for Decky Loader Russia (deckyloader.ru)",
+        "tabSpotify": "Spotify",
+        "sourceSpotify": "Spotify",
+        "spotifySectionTitle": "Spotify",
+        "myMusic": "My Music",
+        "myPlaylists": "My Playlists",
+        "likedTracks": "Liked Songs",
+        "openInBrowser": "Open in Browser",
+        "scanQrWithPhone": "Scan with your phone camera:",
+        "pasteTokenOrUrl": "Or paste token / redirect URL:",
+        "tokenFieldPlaceholder": "Token or address bar URL",
+        "vkInstructions": "1. Click 'Open in Browser'.\n2. Click 'Allow' on the VK page.\n3. Login will complete automatically.",
+        "betaNotice": "Beta version: this section may work incorrectly.",
+        "spotifyInstructions": "1. Click 'Open in Browser' or scan the QR code to authenticate with Spotify.\n2. Or enter your Client ID and Client Secret from Spotify Developer Dashboard.",
+        "spotifyClientId": "Spotify Client ID",
+        "spotifyClientSecret": "Spotify Client Secret",
+        "spotifySaveCredentials": "Save Credentials",
+        "spotifyAuthWithCredentials": "Log In with Credentials",
+        "noPlaylistsFound": "No playlists found",
+        "noTracksFound": "No tracks found",
+        "backToPlaylists": "← Back to playlists",
+        "trackCount": "{0} tracks",
+        "searchResults": "Search Results",
+        "searchVkPlaceholder": "Search tracks in VK Music",
+        "searchSpotifyPlaceholder": "Search tracks in Spotify",
+        "vkAuthHeader": "VK Music Authorization",
+        "spotifyAuthHeader": "Spotify Authorization",
+        "featSpotifyTitle": "Spotify",
+        "featSpotifyDesc": "Search, playback and download tracks and playlists from Spotify."
     },
     "no": {
         "tabPlayer": "Spiller",
@@ -2670,7 +2917,35 @@ const translations = {
         "techAudioEngine": "Audio Engine:",
         "techInterface": "User Interface:",
         "techConversion": "Audio Conversion:",
-        "techCreatedFor": "Created for Decky Loader Russia (deckyloader.ru)"
+        "techCreatedFor": "Created for Decky Loader Russia (deckyloader.ru)",
+        "tabSpotify": "Spotify",
+        "sourceSpotify": "Spotify",
+        "spotifySectionTitle": "Spotify",
+        "myMusic": "My Music",
+        "myPlaylists": "My Playlists",
+        "likedTracks": "Liked Songs",
+        "openInBrowser": "Open in Browser",
+        "scanQrWithPhone": "Scan with your phone camera:",
+        "pasteTokenOrUrl": "Or paste token / redirect URL:",
+        "tokenFieldPlaceholder": "Token or address bar URL",
+        "vkInstructions": "1. Click 'Open in Browser'.\n2. Click 'Allow' on the VK page.\n3. Login will complete automatically.",
+        "betaNotice": "Beta version: this section may work incorrectly.",
+        "spotifyInstructions": "1. Click 'Open in Browser' or scan the QR code to authenticate with Spotify.\n2. Or enter your Client ID and Client Secret from Spotify Developer Dashboard.",
+        "spotifyClientId": "Spotify Client ID",
+        "spotifyClientSecret": "Spotify Client Secret",
+        "spotifySaveCredentials": "Save Credentials",
+        "spotifyAuthWithCredentials": "Log In with Credentials",
+        "noPlaylistsFound": "No playlists found",
+        "noTracksFound": "No tracks found",
+        "backToPlaylists": "← Back to playlists",
+        "trackCount": "{0} tracks",
+        "searchResults": "Search Results",
+        "searchVkPlaceholder": "Search tracks in VK Music",
+        "searchSpotifyPlaceholder": "Search tracks in Spotify",
+        "vkAuthHeader": "VK Music Authorization",
+        "spotifyAuthHeader": "Spotify Authorization",
+        "featSpotifyTitle": "Spotify",
+        "featSpotifyDesc": "Search, playback and download tracks and playlists from Spotify."
     },
     "ro": {
         "tabPlayer": "Redare",
@@ -2778,7 +3053,35 @@ const translations = {
         "techAudioEngine": "Audio Engine:",
         "techInterface": "User Interface:",
         "techConversion": "Audio Conversion:",
-        "techCreatedFor": "Created for Decky Loader Russia (deckyloader.ru)"
+        "techCreatedFor": "Created for Decky Loader Russia (deckyloader.ru)",
+        "tabSpotify": "Spotify",
+        "sourceSpotify": "Spotify",
+        "spotifySectionTitle": "Spotify",
+        "myMusic": "My Music",
+        "myPlaylists": "My Playlists",
+        "likedTracks": "Liked Songs",
+        "openInBrowser": "Open in Browser",
+        "scanQrWithPhone": "Scan with your phone camera:",
+        "pasteTokenOrUrl": "Or paste token / redirect URL:",
+        "tokenFieldPlaceholder": "Token or address bar URL",
+        "vkInstructions": "1. Click 'Open in Browser'.\n2. Click 'Allow' on the VK page.\n3. Login will complete automatically.",
+        "betaNotice": "Beta version: this section may work incorrectly.",
+        "spotifyInstructions": "1. Click 'Open in Browser' or scan the QR code to authenticate with Spotify.\n2. Or enter your Client ID and Client Secret from Spotify Developer Dashboard.",
+        "spotifyClientId": "Spotify Client ID",
+        "spotifyClientSecret": "Spotify Client Secret",
+        "spotifySaveCredentials": "Save Credentials",
+        "spotifyAuthWithCredentials": "Log In with Credentials",
+        "noPlaylistsFound": "No playlists found",
+        "noTracksFound": "No tracks found",
+        "backToPlaylists": "← Back to playlists",
+        "trackCount": "{0} tracks",
+        "searchResults": "Search Results",
+        "searchVkPlaceholder": "Search tracks in VK Music",
+        "searchSpotifyPlaceholder": "Search tracks in Spotify",
+        "vkAuthHeader": "VK Music Authorization",
+        "spotifyAuthHeader": "Spotify Authorization",
+        "featSpotifyTitle": "Spotify",
+        "featSpotifyDesc": "Search, playback and download tracks and playlists from Spotify."
     },
     "sv": {
         "tabPlayer": "Spelare",
@@ -2886,7 +3189,35 @@ const translations = {
         "techAudioEngine": "Audio Engine:",
         "techInterface": "User Interface:",
         "techConversion": "Audio Conversion:",
-        "techCreatedFor": "Created for Decky Loader Russia (deckyloader.ru)"
+        "techCreatedFor": "Created for Decky Loader Russia (deckyloader.ru)",
+        "tabSpotify": "Spotify",
+        "sourceSpotify": "Spotify",
+        "spotifySectionTitle": "Spotify",
+        "myMusic": "My Music",
+        "myPlaylists": "My Playlists",
+        "likedTracks": "Liked Songs",
+        "openInBrowser": "Open in Browser",
+        "scanQrWithPhone": "Scan with your phone camera:",
+        "pasteTokenOrUrl": "Or paste token / redirect URL:",
+        "tokenFieldPlaceholder": "Token or address bar URL",
+        "vkInstructions": "1. Click 'Open in Browser'.\n2. Click 'Allow' on the VK page.\n3. Login will complete automatically.",
+        "betaNotice": "Beta version: this section may work incorrectly.",
+        "spotifyInstructions": "1. Click 'Open in Browser' or scan the QR code to authenticate with Spotify.\n2. Or enter your Client ID and Client Secret from Spotify Developer Dashboard.",
+        "spotifyClientId": "Spotify Client ID",
+        "spotifyClientSecret": "Spotify Client Secret",
+        "spotifySaveCredentials": "Save Credentials",
+        "spotifyAuthWithCredentials": "Log In with Credentials",
+        "noPlaylistsFound": "No playlists found",
+        "noTracksFound": "No tracks found",
+        "backToPlaylists": "← Back to playlists",
+        "trackCount": "{0} tracks",
+        "searchResults": "Search Results",
+        "searchVkPlaceholder": "Search tracks in VK Music",
+        "searchSpotifyPlaceholder": "Search tracks in Spotify",
+        "vkAuthHeader": "VK Music Authorization",
+        "spotifyAuthHeader": "Spotify Authorization",
+        "featSpotifyTitle": "Spotify",
+        "featSpotifyDesc": "Search, playback and download tracks and playlists from Spotify."
     },
     "vi": {
         "tabPlayer": "Trình phát",
@@ -2994,7 +3325,35 @@ const translations = {
         "techAudioEngine": "Audio Engine:",
         "techInterface": "User Interface:",
         "techConversion": "Audio Conversion:",
-        "techCreatedFor": "Created for Decky Loader Russia (deckyloader.ru)"
+        "techCreatedFor": "Created for Decky Loader Russia (deckyloader.ru)",
+        "tabSpotify": "Spotify",
+        "sourceSpotify": "Spotify",
+        "spotifySectionTitle": "Spotify",
+        "myMusic": "My Music",
+        "myPlaylists": "My Playlists",
+        "likedTracks": "Liked Songs",
+        "openInBrowser": "Open in Browser",
+        "scanQrWithPhone": "Scan with your phone camera:",
+        "pasteTokenOrUrl": "Or paste token / redirect URL:",
+        "tokenFieldPlaceholder": "Token or address bar URL",
+        "vkInstructions": "1. Click 'Open in Browser'.\n2. Click 'Allow' on the VK page.\n3. Login will complete automatically.",
+        "betaNotice": "Beta version: this section may work incorrectly.",
+        "spotifyInstructions": "1. Click 'Open in Browser' or scan the QR code to authenticate with Spotify.\n2. Or enter your Client ID and Client Secret from Spotify Developer Dashboard.",
+        "spotifyClientId": "Spotify Client ID",
+        "spotifyClientSecret": "Spotify Client Secret",
+        "spotifySaveCredentials": "Save Credentials",
+        "spotifyAuthWithCredentials": "Log In with Credentials",
+        "noPlaylistsFound": "No playlists found",
+        "noTracksFound": "No tracks found",
+        "backToPlaylists": "← Back to playlists",
+        "trackCount": "{0} tracks",
+        "searchResults": "Search Results",
+        "searchVkPlaceholder": "Search tracks in VK Music",
+        "searchSpotifyPlaceholder": "Search tracks in Spotify",
+        "vkAuthHeader": "VK Music Authorization",
+        "spotifyAuthHeader": "Spotify Authorization",
+        "featSpotifyTitle": "Spotify",
+        "featSpotifyDesc": "Search, playback and download tracks and playlists from Spotify."
     },
     "bg": {
         "tabPlayer": "Плейър",
@@ -3102,7 +3461,35 @@ const translations = {
         "techAudioEngine": "Audio Engine:",
         "techInterface": "User Interface:",
         "techConversion": "Audio Conversion:",
-        "techCreatedFor": "Created for Decky Loader Russia (deckyloader.ru)"
+        "techCreatedFor": "Created for Decky Loader Russia (deckyloader.ru)",
+        "tabSpotify": "Spotify",
+        "sourceSpotify": "Spotify",
+        "spotifySectionTitle": "Spotify",
+        "myMusic": "My Music",
+        "myPlaylists": "My Playlists",
+        "likedTracks": "Liked Songs",
+        "openInBrowser": "Open in Browser",
+        "scanQrWithPhone": "Scan with your phone camera:",
+        "pasteTokenOrUrl": "Or paste token / redirect URL:",
+        "tokenFieldPlaceholder": "Token or address bar URL",
+        "vkInstructions": "1. Click 'Open in Browser'.\n2. Click 'Allow' on the VK page.\n3. Login will complete automatically.",
+        "betaNotice": "Beta version: this section may work incorrectly.",
+        "spotifyInstructions": "1. Click 'Open in Browser' or scan the QR code to authenticate with Spotify.\n2. Or enter your Client ID and Client Secret from Spotify Developer Dashboard.",
+        "spotifyClientId": "Spotify Client ID",
+        "spotifyClientSecret": "Spotify Client Secret",
+        "spotifySaveCredentials": "Save Credentials",
+        "spotifyAuthWithCredentials": "Log In with Credentials",
+        "noPlaylistsFound": "No playlists found",
+        "noTracksFound": "No tracks found",
+        "backToPlaylists": "← Back to playlists",
+        "trackCount": "{0} tracks",
+        "searchResults": "Search Results",
+        "searchVkPlaceholder": "Search tracks in VK Music",
+        "searchSpotifyPlaceholder": "Search tracks in Spotify",
+        "vkAuthHeader": "VK Music Authorization",
+        "spotifyAuthHeader": "Spotify Authorization",
+        "featSpotifyTitle": "Spotify",
+        "featSpotifyDesc": "Search, playback and download tracks and playlists from Spotify."
     },
     "id": {
         "tabPlayer": "Pemutar",
@@ -3210,7 +3597,35 @@ const translations = {
         "techAudioEngine": "Audio Engine:",
         "techInterface": "User Interface:",
         "techConversion": "Audio Conversion:",
-        "techCreatedFor": "Created for Decky Loader Russia (deckyloader.ru)"
+        "techCreatedFor": "Created for Decky Loader Russia (deckyloader.ru)",
+        "tabSpotify": "Spotify",
+        "sourceSpotify": "Spotify",
+        "spotifySectionTitle": "Spotify",
+        "myMusic": "My Music",
+        "myPlaylists": "My Playlists",
+        "likedTracks": "Liked Songs",
+        "openInBrowser": "Open in Browser",
+        "scanQrWithPhone": "Scan with your phone camera:",
+        "pasteTokenOrUrl": "Or paste token / redirect URL:",
+        "tokenFieldPlaceholder": "Token or address bar URL",
+        "vkInstructions": "1. Click 'Open in Browser'.\n2. Click 'Allow' on the VK page.\n3. Login will complete automatically.",
+        "betaNotice": "Beta version: this section may work incorrectly.",
+        "spotifyInstructions": "1. Click 'Open in Browser' or scan the QR code to authenticate with Spotify.\n2. Or enter your Client ID and Client Secret from Spotify Developer Dashboard.",
+        "spotifyClientId": "Spotify Client ID",
+        "spotifyClientSecret": "Spotify Client Secret",
+        "spotifySaveCredentials": "Save Credentials",
+        "spotifyAuthWithCredentials": "Log In with Credentials",
+        "noPlaylistsFound": "No playlists found",
+        "noTracksFound": "No tracks found",
+        "backToPlaylists": "← Back to playlists",
+        "trackCount": "{0} tracks",
+        "searchResults": "Search Results",
+        "searchVkPlaceholder": "Search tracks in VK Music",
+        "searchSpotifyPlaceholder": "Search tracks in Spotify",
+        "vkAuthHeader": "VK Music Authorization",
+        "spotifyAuthHeader": "Spotify Authorization",
+        "featSpotifyTitle": "Spotify",
+        "featSpotifyDesc": "Search, playback and download tracks and playlists from Spotify."
     },
     "th": {
         "tabPlayer": "เครื่องเล่น",
@@ -3318,7 +3733,35 @@ const translations = {
         "techAudioEngine": "Audio Engine:",
         "techInterface": "User Interface:",
         "techConversion": "Audio Conversion:",
-        "techCreatedFor": "Created for Decky Loader Russia (deckyloader.ru)"
+        "techCreatedFor": "Created for Decky Loader Russia (deckyloader.ru)",
+        "tabSpotify": "Spotify",
+        "sourceSpotify": "Spotify",
+        "spotifySectionTitle": "Spotify",
+        "myMusic": "My Music",
+        "myPlaylists": "My Playlists",
+        "likedTracks": "Liked Songs",
+        "openInBrowser": "Open in Browser",
+        "scanQrWithPhone": "Scan with your phone camera:",
+        "pasteTokenOrUrl": "Or paste token / redirect URL:",
+        "tokenFieldPlaceholder": "Token or address bar URL",
+        "vkInstructions": "1. Click 'Open in Browser'.\n2. Click 'Allow' on the VK page.\n3. Login will complete automatically.",
+        "betaNotice": "Beta version: this section may work incorrectly.",
+        "spotifyInstructions": "1. Click 'Open in Browser' or scan the QR code to authenticate with Spotify.\n2. Or enter your Client ID and Client Secret from Spotify Developer Dashboard.",
+        "spotifyClientId": "Spotify Client ID",
+        "spotifyClientSecret": "Spotify Client Secret",
+        "spotifySaveCredentials": "Save Credentials",
+        "spotifyAuthWithCredentials": "Log In with Credentials",
+        "noPlaylistsFound": "No playlists found",
+        "noTracksFound": "No tracks found",
+        "backToPlaylists": "← Back to playlists",
+        "trackCount": "{0} tracks",
+        "searchResults": "Search Results",
+        "searchVkPlaceholder": "Search tracks in VK Music",
+        "searchSpotifyPlaceholder": "Search tracks in Spotify",
+        "vkAuthHeader": "VK Music Authorization",
+        "spotifyAuthHeader": "Spotify Authorization",
+        "featSpotifyTitle": "Spotify",
+        "featSpotifyDesc": "Search, playback and download tracks and playlists from Spotify."
     }
 };
 
@@ -3539,27 +3982,10 @@ const QAMPlayerView = ({ status, onRefresh }) => {
     const duration = status.duration || status.track?.duration || 0;
     const position = status.position || 0;
     const pct = duration > 0 ? Math.min(100, Math.max(0, (position / duration) * 100)) : 0;
-    const releaseFocus = (e) => {
-        if (e && e.currentTarget) {
-            try {
-                e.currentTarget.blur();
-            }
-            catch (_) { }
-        }
-        if (typeof document !== "undefined" &&
-            document.activeElement &&
-            typeof document.activeElement.blur === "function") {
-            try {
-                document.activeElement.blur();
-            }
-            catch (_) { }
-        }
-    };
     const handleAction = async (key, action, e) => {
         if (busyRef.current)
             return;
         busyRef.current = true;
-        releaseFocus(e);
         setPressedKey(key);
         try {
             await action();
@@ -3572,16 +3998,14 @@ const QAMPlayerView = ({ status, onRefresh }) => {
                 onRefresh();
                 setPressedKey(null);
                 busyRef.current = false;
-                releaseFocus();
             }, 150);
         }
     };
     const handleRepeatCycle = (e) => {
         const nextMode = status.repeat === "off" ? "all" : status.repeat === "all" ? "one" : "off";
-        handleAction("repeat", () => rpcSetRepeat(nextMode), e);
+        handleAction("repeat", () => rpcSetRepeat(nextMode));
     };
     const handleOpenFullscreen = (e) => {
-        releaseFocus(e);
         setPressedKey("open");
         try {
             if (typeof DFL.Navigation.CloseSideMenus === "function") {
@@ -3594,24 +4018,44 @@ const QAMPlayerView = ({ status, onRefresh }) => {
         }
         setTimeout(() => {
             setPressedKey(null);
-            releaseFocus();
         }, 120);
     };
     return (SP_JSX.jsxs("div", { style: { width: "100%", boxSizing: "border-box" }, children: [SP_JSX.jsx("style", { children: `
         .deckymus-qam-btn {
-          transition: transform 0.08s ease, filter 0.08s ease !important;
-          outline: none !important;
+          transition: transform 0.1s ease, filter 0.1s ease, box-shadow 0.1s ease, outline 0.1s ease !important;
+          box-sizing: border-box !important;
         }
-        .deckymus-qam-btn:focus:not(:focus-visible) {
-          outline: none !important;
-          box-shadow: none !important;
+        .deckymus-qam-btn:focus,
+        .deckymus-qam-btn:focus-visible,
+        .deckymus-qam-btn.focused,
+        .deckymus-qam-btn[data-focused="true"] {
+          outline: 2px solid #3b82f6 !important;
+          outline-offset: 1px !important;
+          box-shadow: 0 0 10px rgba(59, 130, 246, 0.9), inset 0 0 4px rgba(255, 255, 255, 0.4) !important;
+          transform: scale(1.05) !important;
+          filter: brightness(1.25) !important;
+          z-index: 5 !important;
+        }
+        .deckymus-open-btn {
+          transition: transform 0.1s ease, filter 0.1s ease, box-shadow 0.1s ease, outline 0.1s ease !important;
         }
         .deckymus-open-btn,
         .deckymus-open-btn *,
-        .deckymus-open-btn:focus,
         .deckymus-open-btn:active {
           color: #ffffff !important;
           opacity: 1 !important;
+        }
+        .deckymus-open-btn:focus,
+        .deckymus-open-btn:focus-visible,
+        .deckymus-open-btn.focused,
+        .deckymus-open-btn[data-focused="true"] {
+          outline: 2px solid #ffffff !important;
+          outline-offset: 1px !important;
+          box-shadow: 0 0 12px rgba(255, 255, 255, 0.9) !important;
+          transform: scale(1.02) !important;
+          filter: brightness(1.25) !important;
+          color: #ffffff !important;
+          z-index: 5 !important;
         }
       ` }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: {
                         display: "flex",
@@ -3706,17 +4150,14 @@ const QAMPlayerView = ({ status, onRefresh }) => {
                                     backgroundColor: "#3b82f6",
                                     borderRadius: "3px",
                                     transition: "width 0.25s linear",
-                                } }) })] }) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: {
+                                } }) })] }) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.Focusable, { "flow-children": "row", style: {
                         display: "grid",
                         gridTemplateColumns: "repeat(3, 1fr)",
                         gap: "6px",
                         width: "100%",
                         boxSizing: "border-box",
                         marginBottom: "6px",
-                    }, children: [SP_JSX.jsx("div", { style: { minWidth: 0, width: "100%" }, children: SP_JSX.jsx(DFL.DialogButton, { className: "deckymus-qam-btn", disabled: !hasTrack, onPointerDown: () => setPressedKey("prev"), onPointerUp: (e) => {
-                                    setPressedKey(null);
-                                    releaseFocus(e);
-                                }, onClick: (e) => handleAction("prev", rpcPreviousTrack, e), style: {
+                    }, children: [SP_JSX.jsx("div", { style: { minWidth: 0, width: "100%" }, children: SP_JSX.jsx(DFL.DialogButton, { className: "deckymus-qam-btn", disabled: !hasTrack, onPointerDown: () => setPressedKey("prev"), onPointerUp: () => setPressedKey(null), onClick: (e) => handleAction("prev", rpcPreviousTrack), style: {
                                     minWidth: "0px",
                                     width: "100%",
                                     padding: "8px 0",
@@ -3727,10 +4168,7 @@ const QAMPlayerView = ({ status, onRefresh }) => {
                                     border: "1px solid rgba(255, 255, 255, 0.1)",
                                     transform: pressedKey === "prev" ? "scale(0.92)" : "scale(1)",
                                     filter: pressedKey === "prev" ? "brightness(1.4)" : "brightness(1)",
-                                }, children: SP_JSX.jsx(FaBackward, { size: 13 }) }) }), SP_JSX.jsx("div", { style: { minWidth: 0, width: "100%" }, children: SP_JSX.jsx(DFL.DialogButton, { className: "deckymus-qam-btn", disabled: !hasTrack, onPointerDown: () => setPressedKey("play"), onPointerUp: (e) => {
-                                    setPressedKey(null);
-                                    releaseFocus(e);
-                                }, onClick: (e) => handleAction("play", rpcPlayPause, e), style: {
+                                }, children: SP_JSX.jsx(FaBackward, { size: 13 }) }) }), SP_JSX.jsx("div", { style: { minWidth: 0, width: "100%" }, children: SP_JSX.jsx(DFL.DialogButton, { className: "deckymus-qam-btn", disabled: !hasTrack, onPointerDown: () => setPressedKey("play"), onPointerUp: () => setPressedKey(null), onClick: (e) => handleAction("play", rpcPlayPause), style: {
                                     minWidth: "0px",
                                     width: "100%",
                                     padding: "8px 0",
@@ -3741,10 +4179,7 @@ const QAMPlayerView = ({ status, onRefresh }) => {
                                     border: isPlaying ? "1px solid rgba(239, 68, 68, 0.55)" : "1px solid rgba(59, 130, 246, 0.55)",
                                     transform: pressedKey === "play" ? "scale(0.92)" : "scale(1)",
                                     filter: pressedKey === "play" ? "brightness(1.4)" : "brightness(1)",
-                                }, children: isPlaying ? SP_JSX.jsx(FaPause, { size: 13 }) : SP_JSX.jsx(FaPlay, { size: 13 }) }) }), SP_JSX.jsx("div", { style: { minWidth: 0, width: "100%" }, children: SP_JSX.jsx(DFL.DialogButton, { className: "deckymus-qam-btn", disabled: !hasTrack, onPointerDown: () => setPressedKey("next"), onPointerUp: (e) => {
-                                    setPressedKey(null);
-                                    releaseFocus(e);
-                                }, onClick: (e) => handleAction("next", rpcNextTrack, e), style: {
+                                }, children: isPlaying ? SP_JSX.jsx(FaPause, { size: 13 }) : SP_JSX.jsx(FaPlay, { size: 13 }) }) }), SP_JSX.jsx("div", { style: { minWidth: 0, width: "100%" }, children: SP_JSX.jsx(DFL.DialogButton, { className: "deckymus-qam-btn", disabled: !hasTrack, onPointerDown: () => setPressedKey("next"), onPointerUp: () => setPressedKey(null), onClick: (e) => handleAction("next", rpcNextTrack), style: {
                                     minWidth: "0px",
                                     width: "100%",
                                     padding: "8px 0",
@@ -3755,17 +4190,14 @@ const QAMPlayerView = ({ status, onRefresh }) => {
                                     border: "1px solid rgba(255, 255, 255, 0.1)",
                                     transform: pressedKey === "next" ? "scale(0.92)" : "scale(1)",
                                     filter: pressedKey === "next" ? "brightness(1.4)" : "brightness(1)",
-                                }, children: SP_JSX.jsx(FaForward, { size: 13 }) }) })] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: {
+                                }, children: SP_JSX.jsx(FaForward, { size: 13 }) }) })] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.Focusable, { "flow-children": "row", style: {
                         display: "grid",
                         gridTemplateColumns: "repeat(2, 1fr)",
                         gap: "6px",
                         width: "100%",
                         boxSizing: "border-box",
                         marginBottom: "8px",
-                    }, children: [SP_JSX.jsx("div", { style: { minWidth: 0, width: "100%" }, children: SP_JSX.jsxs(DFL.DialogButton, { className: "deckymus-qam-btn", onPointerDown: () => setPressedKey("shuffle"), onPointerUp: (e) => {
-                                    setPressedKey(null);
-                                    releaseFocus(e);
-                                }, onClick: (e) => handleAction("shuffle", rpcToggleShuffle, e), style: {
+                    }, children: [SP_JSX.jsx("div", { style: { minWidth: 0, width: "100%" }, children: SP_JSX.jsxs(DFL.DialogButton, { className: "deckymus-qam-btn", onPointerDown: () => setPressedKey("shuffle"), onPointerUp: () => setPressedKey(null), onClick: (e) => handleAction("shuffle", rpcToggleShuffle), style: {
                                     minWidth: "0px",
                                     width: "100%",
                                     padding: "7px 0",
@@ -3781,10 +4213,7 @@ const QAMPlayerView = ({ status, onRefresh }) => {
                                             fontSize: "11px",
                                             fontWeight: status.shuffle ? 600 : "normal",
                                             color: status.shuffle ? "#60a5fa" : "#94a3b8",
-                                        }, children: t("shuffle") })] }) }), SP_JSX.jsx("div", { style: { minWidth: 0, width: "100%" }, children: SP_JSX.jsxs(DFL.DialogButton, { className: "deckymus-qam-btn", onPointerDown: () => setPressedKey("repeat"), onPointerUp: (e) => {
-                                    setPressedKey(null);
-                                    releaseFocus(e);
-                                }, onClick: (e) => handleRepeatCycle(e), style: {
+                                        }, children: t("shuffle") })] }) }), SP_JSX.jsx("div", { style: { minWidth: 0, width: "100%" }, children: SP_JSX.jsxs(DFL.DialogButton, { className: "deckymus-qam-btn", onPointerDown: () => setPressedKey("repeat"), onPointerUp: () => setPressedKey(null), onClick: (e) => handleRepeatCycle(), style: {
                                     minWidth: "0px",
                                     width: "100%",
                                     padding: "7px 0",
@@ -3800,7 +4229,7 @@ const QAMPlayerView = ({ status, onRefresh }) => {
                                             fontSize: "11px",
                                             fontWeight: status.repeat !== "off" ? 600 : "normal",
                                             color: status.repeat !== "off" ? "#60a5fa" : "#94a3b8",
-                                        }, children: status.repeat === "one" ? t("repeatOne") : status.repeat === "all" ? t("repeatAll") : t("repeatOff") })] }) })] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: {
+                                        }, children: status.repeat === "one" ? t("repeatOne") : status.repeat === "all" ? t("repeatAll") : t("repeatOff") })] }) })] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.Focusable, { "flow-children": "row", style: {
                         display: "flex",
                         alignItems: "center",
                         gap: "10px",
@@ -3811,15 +4240,19 @@ const QAMPlayerView = ({ status, onRefresh }) => {
                         borderRadius: "8px",
                         boxSizing: "border-box",
                         marginBottom: "8px",
-                    }, children: [SP_JSX.jsx("div", { onClick: toggleMute, style: {
+                    }, children: [SP_JSX.jsx(DFL.DialogButton, { className: "deckymus-focus-btn", onClick: toggleMute, style: {
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
                                 cursor: "pointer",
                                 color: volume === 0 ? "#ef4444" : "#60a5fa",
                                 flexShrink: 0,
-                                width: "20px",
-                            }, title: volume === 0 ? t("unmute") : t("mute"), children: volume === 0 ? (SP_JSX.jsx(FaVolumeMute, { size: 14 })) : volume < 50 ? (SP_JSX.jsx(FaVolumeDown, { size: 14 })) : (SP_JSX.jsx(FaVolumeUp, { size: 14 })) }), SP_JSX.jsx("input", { type: "range", min: 0, max: 100, value: volume, onPointerDown: () => {
+                                width: "28px",
+                                minWidth: "28px",
+                                height: "28px",
+                                padding: 0,
+                                backgroundColor: "transparent",
+                            }, children: volume === 0 ? (SP_JSX.jsx(FaVolumeMute, { size: 14 })) : volume < 50 ? (SP_JSX.jsx(FaVolumeDown, { size: 14 })) : (SP_JSX.jsx(FaVolumeUp, { size: 14 })) }), SP_JSX.jsx("input", { type: "range", min: 0, max: 100, value: volume, onPointerDown: () => {
                                 isDraggingVolumeRef.current = true;
                             }, onPointerUp: () => {
                                 isDraggingVolumeRef.current = false;
@@ -3837,10 +4270,7 @@ const QAMPlayerView = ({ status, onRefresh }) => {
                                 textAlign: "right",
                                 fontVariantNumeric: "tabular-nums",
                                 flexShrink: 0,
-                            }, children: [Math.round(volume), "%"] })] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.DialogButton, { className: "deckymus-qam-btn deckymus-open-btn", onPointerDown: () => setPressedKey("open"), onPointerUp: (e) => {
-                        setPressedKey(null);
-                        releaseFocus(e);
-                    }, onClick: (e) => handleOpenFullscreen(e), style: {
+                            }, children: [Math.round(volume), "%"] })] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.DialogButton, { className: "deckymus-qam-btn deckymus-open-btn", onPointerDown: () => setPressedKey("open"), onPointerUp: () => setPressedKey(null), onClick: (e) => handleOpenFullscreen(), style: {
                         minWidth: "0px",
                         width: "100%",
                         display: "flex",
@@ -3883,6 +4313,20 @@ const VkMusicIcon = ({ size = 16, className, style }) => {
             flexShrink: 0,
             ...style,
         }, children: [SP_JSX.jsxs("defs", { children: [SP_JSX.jsx("clipPath", { id: clipId, children: SP_JSX.jsx("rect", { x: "0", y: "0", width: "100", height: "100", rx: "22", ry: "22" }) }), SP_JSX.jsxs("mask", { id: maskId, children: [SP_JSX.jsx("rect", { x: "0", y: "0", width: "100", height: "100", fill: "#ffffff" }), SP_JSX.jsx("rect", { x: "11.8", y: "53.0", width: "8.8", height: "14.0", rx: "4.4", ry: "4.4", fill: "#000000" }), SP_JSX.jsx("rect", { x: "28.2", y: "53.0", width: "8.8", height: "14.0", rx: "4.4", ry: "4.4", fill: "#000000" }), SP_JSX.jsx("rect", { x: "44.8", y: "46.8", width: "8.8", height: "26.4", rx: "4.4", ry: "4.4", fill: "#000000" }), SP_JSX.jsx("rect", { x: "61.2", y: "35.3", width: "8.8", height: "49.4", rx: "4.4", ry: "4.4", fill: "#000000" }), SP_JSX.jsx("rect", { x: "77.6", y: "46.8", width: "8.8", height: "26.4", rx: "4.4", ry: "4.4", fill: "#000000" })] })] }), SP_JSX.jsxs("g", { clipPath: `url(#${clipId})`, mask: `url(#${maskId})`, children: [SP_JSX.jsx("rect", { x: "0", y: "0", width: "100", height: "100", fill: "#0073f7" }), SP_JSX.jsx("path", { fill: "#ec5cf7", d: "M 0,46.5 C 32,46.5 46,20 66,20 C 81,20 92,29 100,35.5 L 100,100 L 0,100 Z" })] })] }));
+};
+
+/**
+ * Spotify Icon:
+ * Authentic Spotify green circle (#1ed760) with true transparent cutout holes (not black bars)
+ * so that any background behind the icon shows through the sound waves.
+ */
+const SpotifyIcon = ({ size = 16, className, style }) => {
+    return (SP_JSX.jsx("svg", { width: size, height: size, viewBox: "0 0 496 512", className: className, style: {
+            display: "inline-block",
+            verticalAlign: "middle",
+            flexShrink: 0,
+            ...style,
+        }, children: SP_JSX.jsx("path", { fill: "#1ed760", fillRule: "evenodd", d: "M248 8C111.1 8 0 119.1 0 256s111.1 248 248 248 248-111.1 248-248S384.9 8 248 8zm100.7 364.9c-4.2 0-6.8-1.3-10.7-3.6-62.4-37.6-135-39.2-206.7-24.5-3.9 1-9 2.6-11.9 2.6-9.7 0-15.8-7.7-15.8-15.8 0-10.3 6.1-15.2 13.6-16.8 81.9-18.1 165.6-16.5 237 26.2 6.1 3.9 9.7 7.4 9.7 16.5s-7.1 15.4-15.2 15.4zm26.9-65.6c-5.2 0-8.7-2.3-12.3-4.2-62.5-37-155.7-51.9-238.6-29.4-4.8 1.3-7.4 2.6-11.9 2.6-10.7 0-19.4-8.7-19.4-19.4s5.2-17.8 15.5-20.7c27.8-7.8 56.2-13.6 97.8-13.6 64.9 0 127.6 16.1 177 45.5 8.1 4.8 11.3 11 11.3 19.7-.1 10.8-8.5 19.5-19.4 19.5zm31-76.2c-5.2 0-8.4-1.3-12.9-3.9-71.2-42.5-198.5-52.7-280.9-29.7-3.6 1-8.1 2.6-12.9 2.6-13.2 0-23.3-10.3-23.3-23.6 0-13.6 8.4-21.3 17.4-23.9 35.2-10.3 74.6-15.2 117.5-15.2 73 0 149.5 15.2 205.4 47.8 7.8 4.5 12.9 10.7 12.9 22.6 0 13.6-11 23.3-23.2 23.3z" }) }));
 };
 
 const formatTime = (seconds) => {
@@ -3941,7 +4385,7 @@ const NowPlayingTab = ({ status, onRefresh }) => {
             margin: "0 auto",
             boxSizing: "border-box",
             overflowX: "hidden",
-        }, children: SP_JSX.jsx(DFL.PanelSection, { title: t("nowPlayingHeader"), children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: {
+        }, children: SP_JSX.jsx(DFL.PanelSection, { children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: {
                         display: "flex",
                         gap: "16px",
                         alignItems: "stretch",
@@ -4036,25 +4480,31 @@ const NowPlayingTab = ({ status, onRefresh }) => {
                                                                 ? "rgba(236, 92, 247, 0.25)"
                                                                 : status.track?.source === "yandex"
                                                                     ? "rgba(234, 179, 8, 0.25)"
-                                                                    : status.track?.source === "ytmusic"
-                                                                        ? "rgba(239, 68, 68, 0.25)"
-                                                                        : "rgba(59, 130, 246, 0.25)",
+                                                                    : status.track?.source === "spotify"
+                                                                        ? "rgba(30, 215, 96, 0.25)"
+                                                                        : status.track?.source === "ytmusic"
+                                                                            ? "rgba(239, 68, 68, 0.25)"
+                                                                            : "rgba(59, 130, 246, 0.25)",
                                                             color: status.track?.source === "vk"
                                                                 ? "#ec5cf7"
                                                                 : status.track?.source === "yandex"
                                                                     ? "#facc15"
-                                                                    : status.track?.source === "ytmusic"
-                                                                        ? "#f87171"
-                                                                        : "#60a5fa",
+                                                                    : status.track?.source === "spotify"
+                                                                        ? "#1ed760"
+                                                                        : status.track?.source === "ytmusic"
+                                                                            ? "#f87171"
+                                                                            : "#60a5fa",
                                                         }, children: status.track?.source === "vk"
                                                             ? t("sourceVk")
                                                             : status.track?.source === "yandex"
                                                                 ? t("sourceYandex")
-                                                                : status.track?.source === "ytmusic"
-                                                                    ? t("sourceYtmusic")
-                                                                    : status.track?.source === "local"
-                                                                        ? t("sourceLocal")
-                                                                        : "DeckyMus" }) })] })] }), duration > 0 && (SP_JSX.jsxs("div", { style: {
+                                                                : status.track?.source === "spotify"
+                                                                    ? t("sourceSpotify")
+                                                                    : status.track?.source === "ytmusic"
+                                                                        ? t("sourceYtmusic")
+                                                                        : status.track?.source === "local"
+                                                                            ? t("sourceLocal")
+                                                                            : "DeckyMus" }) })] })] }), duration > 0 && (SP_JSX.jsxs("div", { style: {
                                         display: "flex",
                                         flexDirection: "column",
                                         gap: "4px",
@@ -4066,7 +4516,7 @@ const NowPlayingTab = ({ status, onRefresh }) => {
                                                 width: "100%",
                                                 accentColor: "#3b82f6",
                                                 cursor: "pointer",
-                                            } })] })), SP_JSX.jsxs("div", { style: {
+                                            } })] })), SP_JSX.jsxs(DFL.Focusable, { "flow-children": "row", style: {
                                         display: "grid",
                                         gridTemplateColumns: "repeat(5, 1fr)",
                                         gap: "8px",
@@ -4074,33 +4524,33 @@ const NowPlayingTab = ({ status, onRefresh }) => {
                                         minWidth: 0,
                                         maxWidth: "100%",
                                         boxSizing: "border-box",
-                                    }, children: [SP_JSX.jsx(DFL.DialogButton, { onClick: () => handleAction(rpcToggleShuffle), style: {
+                                    }, children: [SP_JSX.jsx(DFL.DialogButton, { className: "deckymus-ctrl-btn", onClick: () => handleAction(rpcToggleShuffle), style: {
                                                 minWidth: 0,
                                                 padding: "10px 0",
                                                 display: "flex",
                                                 alignItems: "center",
                                                 justifyContent: "center",
                                                 backgroundColor: status.shuffle ? "rgba(59, 130, 246, 0.4)" : undefined,
-                                            }, children: SP_JSX.jsx(FaRandom, { size: 14, color: status.shuffle ? "#60a5fa" : undefined }) }), SP_JSX.jsx(DFL.DialogButton, { disabled: !hasTrack, onClick: () => handleAction(rpcPreviousTrack), style: {
+                                            }, children: SP_JSX.jsx(FaRandom, { size: 14, color: status.shuffle ? "#60a5fa" : undefined }) }), SP_JSX.jsx(DFL.DialogButton, { className: "deckymus-ctrl-btn", disabled: !hasTrack, onClick: () => handleAction(rpcPreviousTrack), style: {
                                                 minWidth: 0,
                                                 padding: "10px 0",
                                                 display: "flex",
                                                 alignItems: "center",
                                                 justifyContent: "center",
-                                            }, children: SP_JSX.jsx(FaBackward, { size: 14 }) }), SP_JSX.jsx(DFL.DialogButton, { disabled: !hasTrack, onClick: () => handleAction(rpcPlayPause), style: {
+                                            }, children: SP_JSX.jsx(FaBackward, { size: 14 }) }), SP_JSX.jsx(DFL.DialogButton, { className: "deckymus-ctrl-btn", disabled: !hasTrack, onClick: () => handleAction(rpcPlayPause), style: {
                                                 minWidth: 0,
                                                 padding: "10px 0",
                                                 display: "flex",
                                                 alignItems: "center",
                                                 justifyContent: "center",
                                                 backgroundColor: isPlaying ? "rgba(239, 68, 68, 0.4)" : "rgba(34, 197, 94, 0.4)",
-                                            }, children: isPlaying ? SP_JSX.jsx(FaPause, { size: 14 }) : SP_JSX.jsx(FaPlay, { size: 14 }) }), SP_JSX.jsx(DFL.DialogButton, { disabled: !hasTrack, onClick: () => handleAction(rpcNextTrack), style: {
+                                            }, children: isPlaying ? SP_JSX.jsx(FaPause, { size: 14 }) : SP_JSX.jsx(FaPlay, { size: 14 }) }), SP_JSX.jsx(DFL.DialogButton, { className: "deckymus-ctrl-btn", disabled: !hasTrack, onClick: () => handleAction(rpcNextTrack), style: {
                                                 minWidth: 0,
                                                 padding: "10px 0",
                                                 display: "flex",
                                                 alignItems: "center",
                                                 justifyContent: "center",
-                                            }, children: SP_JSX.jsx(FaForward, { size: 14 }) }), SP_JSX.jsxs(DFL.DialogButton, { onClick: handleRepeatCycle, style: {
+                                            }, children: SP_JSX.jsx(FaForward, { size: 14 }) }), SP_JSX.jsxs(DFL.DialogButton, { className: "deckymus-ctrl-btn", onClick: handleRepeatCycle, style: {
                                                 minWidth: 0,
                                                 padding: "10px 0",
                                                 display: "flex",
@@ -4168,7 +4618,7 @@ const NowPlayingTab = ({ status, onRefresh }) => {
                                     }, title: volume === 0 ? t("unmute") : t("mute"), children: volume === 0 ? (SP_JSX.jsx(FaVolumeMute, { size: 16 })) : volume < 50 ? (SP_JSX.jsx(FaVolumeDown, { size: 16 })) : (SP_JSX.jsx(FaVolumeUp, { size: 16 })) })] })] }) }) }) }));
 };
 
-const formatDuration$2 = (seconds) => {
+const formatDuration$4 = (seconds) => {
     if (!seconds || seconds <= 0)
         return "--:--";
     const m = Math.floor(seconds / 60);
@@ -4181,6 +4631,7 @@ const LocalLibraryTab = ({ status, onRefresh }) => {
     const [loading, setLoading] = SP_REACT.useState(false);
     const [query, setQuery] = SP_REACT.useState("");
     const [loadingTrackIdx, setLoadingTrackIdx] = SP_REACT.useState(null);
+    SP_REACT.useRef(null);
     const loadTracks = async () => {
         setLoading(true);
         try {
@@ -4239,30 +4690,31 @@ const LocalLibraryTab = ({ status, onRefresh }) => {
             margin: "0 auto",
             boxSizing: "border-box",
             overflowX: "hidden",
-        }, children: SP_JSX.jsxs(DFL.PanelSection, { title: t("localSectionTitle"), children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: {
+        }, children: SP_JSX.jsxs(DFL.PanelSection, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.Focusable, { "flow-children": "row", style: {
                             display: "flex",
-                            gap: "10px",
+                            gap: "8px",
                             width: "100%",
-                            minWidth: 0,
-                            maxWidth: "100%",
-                            boxSizing: "border-box",
                             marginBottom: "12px",
                             alignItems: "center",
-                        }, children: [SP_JSX.jsx("div", { style: { flex: "1 1 0%", minWidth: 0 }, children: SP_JSX.jsx(DFL.TextField, { label: t("searchTracksPlaceholder"), value: query, onChange: (e) => setQuery(e.target.value) }) }), SP_JSX.jsx("div", { style: { width: "140px" }, children: SP_JSX.jsxs(DFL.DialogButton, { disabled: loading, onClick: loadTracks, style: {
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        gap: "6px",
-                                        padding: "8px 0",
-                                    }, children: [SP_JSX.jsx(FaSync, { className: loading ? "spin" : "", size: 12 }), SP_JSX.jsx("span", { children: loading ? t("searchingBtn") : t("refreshBtn") })] }) })] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: {
+                        }, children: [SP_JSX.jsx("div", { style: { flex: 1, minWidth: 0 }, children: SP_JSX.jsx(DFL.TextField, { value: query, onChange: (e) => setQuery(e?.target?.value || ""), placeholder: t("searchTracksPlaceholder") }) }), SP_JSX.jsx(DFL.DialogButton, { className: "deckymus-focus-btn", disabled: loading, onClick: loadTracks, style: {
+                                    width: "40px",
+                                    minWidth: "40px",
+                                    height: "40px",
+                                    padding: "0",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    borderRadius: "8px",
+                                    flexShrink: 0,
+                                }, children: SP_JSX.jsx(FaSync, { className: loading ? "spin" : "", size: 14 }) })] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: {
                             width: "100%",
                             minWidth: 0,
                             maxWidth: "100%",
                             display: "flex",
                             flexDirection: "column",
                             gap: "6px",
+                            padding: "4px 6px",
                             boxSizing: "border-box",
-                            overflowX: "hidden",
                         }, children: [SP_JSX.jsx("div", { style: { fontSize: "12px", color: "#94a3b8", marginBottom: "4px" }, children: t("tracksFound", filteredTracks.length) }), filteredTracks.length === 0 && !loading && (SP_JSX.jsxs("div", { style: {
                                     padding: "32px",
                                     textAlign: "center",
@@ -4271,107 +4723,617 @@ const LocalLibraryTab = ({ status, onRefresh }) => {
                                     color: "#94a3b8",
                                 }, children: [SP_JSX.jsx(FaMusic, { size: 32, style: { marginBottom: "8px", opacity: 0.5 } }), SP_JSX.jsx("div", { children: t("musicNotFound") }), SP_JSX.jsx("div", { style: { fontSize: "12px", marginTop: "4px" }, children: t("musicNotFoundHint") })] })), filteredTracks.map((item, idx) => {
                                 const isCurrent = (item.path && status.track?.path === item.path) || (item.id && status.track?.id === item.id);
-                                const isPlaying = status.playback_status === "Playing";
+                                const isPlaying = isCurrent && status.playback_status === "Playing";
+                                const isCurrentPaused = isCurrent && status.playback_status === "Paused";
                                 const isLoadingThis = loadingTrackIdx === idx;
-                                return (SP_JSX.jsxs(DFL.DialogButton, { onClick: () => handlePlay(idx), style: {
-                                        width: "100%",
+                                return (SP_JSX.jsxs(DFL.Focusable, { className: "deckymus-focus-btn deckymus-track-row", onActivate: () => {
+                                        if (isPlaying) {
+                                            rpcPlayPause().then(onRefresh);
+                                        }
+                                        else if (isCurrentPaused) {
+                                            rpcPlayPause().then(onRefresh);
+                                        }
+                                        else {
+                                            handlePlay(idx);
+                                        }
+                                    }, style: {
                                         display: "flex",
                                         alignItems: "center",
                                         justifyContent: "space-between",
                                         padding: "8px 12px",
-                                        backgroundColor: isCurrent ? "rgba(59, 130, 246, 0.25)" : "rgba(255, 255, 255, 0.04)",
-                                        border: isCurrent ? "1px solid rgba(59, 130, 246, 0.6)" : "1px solid transparent",
-                                        textAlign: "left",
-                                        marginBottom: "4px",
-                                    }, children: [SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", gap: "12px", minWidth: 0, flex: 1 }, children: [SP_JSX.jsx("div", { style: {
-                                                        width: "42px",
-                                                        height: "42px",
-                                                        borderRadius: "6px",
+                                        backgroundColor: isPlaying
+                                            ? "rgba(59, 130, 246, 0.2)"
+                                            : "rgba(255, 255, 255, 0.03)",
+                                        border: isPlaying ? "1px solid #3b82f6" : "1px solid rgba(255, 255, 255, 0.06)",
+                                        borderRadius: "8px",
+                                        gap: "10px",
+                                        cursor: "pointer",
+                                    }, children: [SP_JSX.jsx("div", { style: {
+                                                minWidth: "36px",
+                                                width: "36px",
+                                                height: "36px",
+                                                padding: "0",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                borderRadius: "50%",
+                                                backgroundColor: isPlaying ? "#3b82f6" : "rgba(255, 255, 255, 0.1)",
+                                                color: "#fff",
+                                                flexShrink: 0,
+                                            }, children: isLoadingThis ? (SP_JSX.jsx(FaSpinner, { className: "spin", size: 12 })) : isPlaying ? (SP_JSX.jsx(FaPause, { size: 12 })) : (SP_JSX.jsx(FaPlay, { size: 12, style: { marginLeft: "2px" } })) }), item.art_url ? (SP_JSX.jsx("img", { src: item.art_url, alt: "", style: { width: "38px", height: "38px", borderRadius: "6px", objectFit: "cover", flexShrink: 0 } })) : (SP_JSX.jsx("div", { style: {
+                                                width: "38px",
+                                                height: "38px",
+                                                borderRadius: "6px",
+                                                backgroundColor: "rgba(255, 255, 255, 0.08)",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                color: "#94a3b8",
+                                                flexShrink: 0,
+                                            }, children: SP_JSX.jsx(FaMusic, { size: 14 }) })), SP_JSX.jsxs("div", { style: { flex: 1, minWidth: 0, overflow: "hidden" }, children: [SP_JSX.jsx("div", { style: {
+                                                        fontSize: "14px",
+                                                        fontWeight: 600,
+                                                        color: isPlaying ? "#60a5fa" : "#f8fafc",
+                                                        whiteSpace: "nowrap",
                                                         overflow: "hidden",
-                                                        backgroundColor: "rgba(0, 0, 0, 0.3)",
-                                                        display: "flex",
-                                                        alignItems: "center",
-                                                        justifyContent: "center",
-                                                        flexShrink: 0,
-                                                    }, children: item.art_url ? (SP_JSX.jsx("img", { src: item.art_url, alt: "", style: { width: "100%", height: "100%", objectFit: "cover" } })) : (SP_JSX.jsx(FaMusic, { size: 16, color: "#64748b" })) }), SP_JSX.jsxs("div", { style: { flex: 1, minWidth: 0, overflow: "hidden" }, children: [SP_JSX.jsx("div", { style: {
-                                                                fontSize: "14px",
-                                                                fontWeight: 600,
-                                                                color: isCurrent ? "#60a5fa" : "#f8fafc",
-                                                                whiteSpace: "nowrap",
-                                                                overflow: "hidden",
-                                                                textOverflow: "ellipsis",
-                                                            }, children: item.title }), SP_JSX.jsx("div", { style: {
-                                                                fontSize: "12px",
-                                                                color: "#94a3b8",
-                                                                whiteSpace: "nowrap",
-                                                                overflow: "hidden",
-                                                                textOverflow: "ellipsis",
-                                                            }, children: item.artist || t("unknownArtist") })] })] }), SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }, children: [SP_JSX.jsx("span", { style: { fontSize: "12px", color: "#64748b" }, children: formatDuration$2(item.duration) }), isLoadingThis ? (SP_JSX.jsx(FaSpinner, { className: "spin", size: 12, color: "#60a5fa" })) : isCurrent && isPlaying ? (SP_JSX.jsx(FaPause, { size: 11, color: "#60a5fa" })) : (SP_JSX.jsx(FaPlay, { size: 11, color: isCurrent ? "#60a5fa" : "#94a3b8" }))] })] }, item.id || item.path || idx));
+                                                        textOverflow: "ellipsis",
+                                                    }, children: item.title }), SP_JSX.jsx("div", { style: {
+                                                        fontSize: "12px",
+                                                        color: "#94a3b8",
+                                                        whiteSpace: "nowrap",
+                                                        overflow: "hidden",
+                                                        textOverflow: "ellipsis",
+                                                    }, children: item.artist || t("unknownArtist") })] }), SP_JSX.jsx("div", { style: { fontSize: "12px", color: "#64748b", minWidth: "40px", textAlign: "right", flexShrink: 0 }, children: formatDuration$4(item.duration) })] }, item.id || item.path || idx));
                             })] }) })] }) }));
 };
 
-const VkMusicTab = () => {
+/**
+ * Robust external auth URL opener for SteamOS / Decky Loader.
+ * Supports modern SteamOS (WindowStore.m_mapDesiredWindowInstances) as well as legacy navigators and backend CEF bridge.
+ */
+const openExternalAuthUrl = async (url) => {
+    if (!url)
+        return;
+    // 1. Direct navigation through modern SteamOS WindowStore Navigator
+    try {
+        const s = window.SteamUIStore;
+        const w = s?.WindowStore?.m_mapDesiredWindowInstances?.get?.(1) || s?.GetFocusedWindowInstance?.();
+        if (typeof w?.m_Navigator?.ExternalWeb === "function") {
+            w.m_Navigator.ExternalWeb(url);
+        }
+    }
+    catch (e) {
+        console.warn("Direct m_Navigator.ExternalWeb failed:", e);
+    }
+    // 2. Navigation through @decky/ui router
+    try {
+        if (typeof DFL.Navigation?.NavigateToExternalWeb === "function") {
+            DFL.Navigation.NavigateToExternalWeb(url);
+        }
+    }
+    catch (e) {
+        console.warn("Navigation.NavigateToExternalWeb failed:", e);
+    }
+    // 3. Fallback / complementary backend CEF trigger
+    try {
+        await rpcOpenBrowser(url);
+    }
+    catch (e) {
+        console.warn("rpcOpenBrowser failed:", e);
+    }
+};
+
+// Persistent caches
+let cachedVkTracks = [];
+let cachedVkPlaylists = [];
+let cachedVkView = "my_music";
+let cachedVkSearchQuery = "";
+let cachedVkSearchResults = [];
+const formatDuration$3 = (seconds) => {
+    if (!seconds || seconds <= 0)
+        return "--:--";
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s < 10 ? "0" : ""}${s}`;
+};
+const VkMusicTab = ({ status, onRefresh }) => {
     const { t } = useTranslation();
+    const [vkStatus, setVkStatus] = SP_REACT.useState({
+        has_token: false,
+        logged_in: false,
+        user_name: "",
+    });
+    const [activeView, setActiveView] = SP_REACT.useState(cachedVkView);
+    const [tracks, setTracks] = SP_REACT.useState(cachedVkTracks);
+    const [playlists, setPlaylists] = SP_REACT.useState(cachedVkPlaylists);
+    const [selectedPlaylist, setSelectedPlaylist] = SP_REACT.useState(null);
+    const [playlistTracks, setPlaylistTracks] = SP_REACT.useState([]);
+    const [searchQuery, setSearchQuery] = SP_REACT.useState(cachedVkSearchQuery);
+    const [searchResults, setSearchResults] = SP_REACT.useState(cachedVkSearchResults);
+    const [loading, setLoading] = SP_REACT.useState(false);
+    const [statusMsg, setStatusMsg] = SP_REACT.useState("");
+    const [statusIsError, setStatusIsError] = SP_REACT.useState(false);
+    const [loadingTrackIdx, setLoadingTrackIdx] = SP_REACT.useState(null);
+    // Manual token input state
+    SP_REACT.useState(false);
+    SP_REACT.useState("");
+    SP_REACT.useState(false);
+    // Downloads tracking
+    const [downloadedIds, setDownloadedIds] = SP_REACT.useState(new Set());
+    const [downloadedNames, setDownloadedNames] = SP_REACT.useState(new Set());
+    const [downloadingIds, setDownloadingIds] = SP_REACT.useState(new Set());
+    const loadDownloaded = async () => {
+        try {
+            const info = await rpcGetDownloadedInfo();
+            if (info) {
+                setDownloadedIds(new Set(info.ids || []));
+                setDownloadedNames(new Set(info.filenames || []));
+            }
+        }
+        catch (e) {
+            console.error("loadDownloaded error:", e);
+        }
+    };
+    const isDownloaded = (item) => {
+        if (item.id && downloadedIds.has(String(item.id)))
+            return true;
+        const cleanT = (item.title || "").toLowerCase().replace(/[\/\\*?:"<>|]/g, "").trim();
+        const cleanA = (item.artist || "").toLowerCase().replace(/[\/\\*?:"<>|]/g, "").trim();
+        const full = cleanA ? `${cleanA} - ${cleanT}` : cleanT;
+        return downloadedNames.has(full) || downloadedNames.has(cleanT);
+    };
+    const handleDownload = async (item) => {
+        const tid = String(item.id);
+        setDownloadingIds((prev) => new Set(prev).add(tid));
+        setStatusIsError(false);
+        setStatusMsg(t("downloadingTrack", item.title));
+        try {
+            const res = await rpcDownloadTrack(item);
+            if (res && res.success) {
+                setDownloadedIds((prev) => new Set(prev).add(tid));
+                const cleanT = (item.title || "").toLowerCase().replace(/[\/\\*?:"<>|]/g, "").trim();
+                const cleanA = (item.artist || "").toLowerCase().replace(/[\/\\*?:"<>|]/g, "").trim();
+                const full = cleanA ? `${cleanA} - ${cleanT}` : cleanT;
+                setDownloadedNames((prev) => new Set(prev).add(full));
+                setStatusIsError(false);
+                setStatusMsg(t("downloadSuccess", item.title));
+                setTimeout(() => setStatusMsg(""), 4000);
+            }
+            else {
+                setStatusIsError(true);
+                setStatusMsg(t("downloadError", res?.error || "Error"));
+                setTimeout(() => setStatusMsg(""), 4000);
+            }
+        }
+        catch (e) {
+            console.error("Download exception:", e);
+            setStatusIsError(true);
+            setStatusMsg(t("downloadError", "Exception"));
+            setTimeout(() => setStatusMsg(""), 4000);
+        }
+        finally {
+            setDownloadingIds((prev) => {
+                const next = new Set(prev);
+                next.delete(tid);
+                return next;
+            });
+        }
+    };
+    const loadStatus = async () => {
+        try {
+            const s = await rpcVkGetStatus();
+            setVkStatus(s);
+            if (s.logged_in) {
+                if (cachedVkTracks.length === 0) {
+                    loadMyMusic();
+                }
+            }
+        }
+        catch (e) {
+            console.error("VK status error:", e);
+        }
+    };
+    const loadMyMusic = async () => {
+        setLoading(true);
+        try {
+            const res = await rpcVkGetMyMusic(0, 100);
+            const list = res || [];
+            setTracks(list);
+            cachedVkTracks = list;
+        }
+        catch (e) {
+            console.error("loadMyMusic error:", e);
+        }
+        finally {
+            setLoading(false);
+        }
+    };
+    const loadPlaylists = async () => {
+        setLoading(true);
+        try {
+            const res = await rpcVkGetPlaylists(0, 50);
+            const list = res || [];
+            setPlaylists(list);
+            cachedVkPlaylists = list;
+        }
+        catch (e) {
+            console.error("loadPlaylists error:", e);
+        }
+        finally {
+            setLoading(false);
+        }
+    };
+    const openPlaylist = async (pl) => {
+        setSelectedPlaylist(pl);
+        setActiveView("playlist_tracks");
+        setLoading(true);
+        try {
+            const res = await rpcVkGetPlaylistTracks(pl.id, pl.owner_id, 0, 100);
+            setPlaylistTracks(res || []);
+        }
+        catch (e) {
+            console.error("openPlaylist error:", e);
+            setPlaylistTracks([]);
+        }
+        finally {
+            setLoading(false);
+        }
+    };
+    const handleSearch = async () => {
+        const q = searchQuery.trim();
+        if (!q)
+            return;
+        setLoading(true);
+        setActiveView("search");
+        cachedVkView = "search";
+        cachedVkSearchQuery = q;
+        try {
+            const res = await rpcVkSearch(q, 0, 50);
+            const list = res || [];
+            setSearchResults(list);
+            cachedVkSearchResults = list;
+        }
+        catch (e) {
+            console.error("VK search error:", e);
+            setSearchResults([]);
+        }
+        finally {
+            setLoading(false);
+        }
+    };
+    const openBrowser = async () => {
+        if (vkStatus.auth_url) {
+            await openExternalAuthUrl(vkStatus.auth_url);
+        }
+    };
+    const handleOpenBrowser = openBrowser;
+    const handlePlayTrack = async (targetList, index) => {
+        setLoadingTrackIdx(index);
+        try {
+            await rpcPlayQueue(targetList, index);
+            onRefresh();
+        }
+        catch (e) {
+            console.error("handlePlayTrack error:", e);
+        }
+        finally {
+            setLoadingTrackIdx(null);
+        }
+    };
+    SP_REACT.useRef(null);
+    SP_REACT.useEffect(() => {
+        loadStatus();
+        loadDownloaded();
+        const interval = setInterval(async () => {
+            // Periodically check if logged in via phone helper or browser session
+            if (!vkStatus.logged_in) {
+                const s = await rpcVkGetStatus();
+                if (s.logged_in) {
+                    setVkStatus(s);
+                    loadMyMusic();
+                    try {
+                        if (typeof DFL.Navigation?.NavigateBack === "function") {
+                            DFL.Navigation.NavigateBack();
+                        }
+                        const sc = window.SteamClient;
+                        if (typeof sc?.Overlay?.CloseOverlay === "function") {
+                            sc.Overlay.CloseOverlay();
+                        }
+                    }
+                    catch (e) { }
+                }
+            }
+        }, 800);
+        return () => clearInterval(interval);
+    }, [vkStatus.logged_in]);
+    const currentList = activeView === "my_music"
+        ? tracks
+        : activeView === "playlist_tracks"
+            ? playlistTracks
+            : searchResults;
     return (SP_JSX.jsx("div", { style: {
             padding: "16px 20px",
             width: "100%",
-            maxWidth: "800px",
+            maxWidth: "850px",
             margin: "0 auto",
             boxSizing: "border-box",
             overflowX: "hidden",
-        }, children: SP_JSX.jsx(DFL.PanelSection, { title: t("vkSectionTitle"), children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: {
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        textAlign: "center",
-                        padding: "40px 24px",
-                        backgroundColor: "rgba(0, 115, 247, 0.06)",
-                        borderRadius: "12px",
-                        border: "1px solid rgba(0, 115, 247, 0.2)",
-                        width: "100%",
-                        boxSizing: "border-box",
-                        margin: "20px 0",
-                    }, children: [SP_JSX.jsx("div", { style: {
-                                width: "72px",
-                                height: "72px",
+        }, children: SP_JSX.jsxs(DFL.PanelSection, { children: [statusMsg && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: {
+                            width: "100%",
+                            padding: "10px 14px",
+                            borderRadius: "8px",
+                            backgroundColor: statusIsError ? "rgba(239, 68, 68, 0.2)" : "rgba(34, 197, 94, 0.2)",
+                            border: `1px solid ${statusIsError ? "rgba(239, 68, 68, 0.4)" : "rgba(34, 197, 94, 0.4)"}`,
+                            color: statusIsError ? "#f87171" : "#4ade80",
+                            fontSize: "13px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            marginBottom: "12px",
+                        }, children: [SP_JSX.jsx("span", { children: statusMsg }), SP_JSX.jsx(DFL.DialogButton, { style: { minWidth: "40px", padding: "4px 8px", fontSize: "11px" }, onClick: () => setStatusMsg(""), children: "\u2715" })] }) })), !vkStatus.logged_in ? (SP_JSX.jsx(SP_JSX.Fragment, { children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: {
                                 display: "flex",
+                                flexDirection: "column",
                                 alignItems: "center",
-                                justifyContent: "center",
-                                backgroundColor: "rgba(0, 0, 0, 0.25)",
-                                borderRadius: "16px",
+                                padding: "28px 20px",
+                                backgroundColor: "rgba(0, 115, 247, 0.08)",
+                                borderRadius: "14px",
+                                border: "1px solid rgba(0, 115, 247, 0.25)",
+                                width: "100%",
+                                boxSizing: "border-box",
                                 marginBottom: "16px",
-                                boxShadow: "0 4px 16px rgba(0, 0, 0, 0.3)",
-                            }, children: SP_JSX.jsx(VkMusicIcon, { size: 56 }) }), SP_JSX.jsx("div", { style: {
-                                fontSize: "18px",
-                                fontWeight: 700,
-                                color: "#f8fafc",
-                                marginBottom: "8px",
-                            }, children: t("vkSectionTitle") }), SP_JSX.jsx("div", { style: {
-                                display: "inline-block",
-                                padding: "6px 14px",
-                                borderRadius: "20px",
-                                backgroundColor: "rgba(236, 92, 247, 0.15)",
-                                border: "1px solid rgba(236, 92, 247, 0.3)",
-                                color: "#ec5cf7",
-                                fontSize: "12px",
-                                fontWeight: 600,
-                                marginBottom: "14px",
-                                letterSpacing: "0.5px",
-                                textTransform: "uppercase",
-                            }, children: t("inDevelopmentBadge") }), SP_JSX.jsx("div", { style: {
-                                fontSize: "14px",
-                                fontWeight: 500,
-                                color: "#e2e8f0",
-                                maxWidth: "460px",
-                                lineHeight: "1.5",
-                                marginBottom: "8px",
-                            }, children: t("vkBannerTitle") }), SP_JSX.jsx("div", { style: {
-                                fontSize: "12px",
-                                color: "#94a3b8",
-                                maxWidth: "440px",
-                                lineHeight: "1.4",
-                            }, children: t("vkBannerDesc") })] }) }) }) }));
+                                textAlign: "center",
+                            }, children: [SP_JSX.jsx("div", { style: {
+                                        width: "64px",
+                                        height: "64px",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        backgroundColor: "rgba(0, 0, 0, 0.3)",
+                                        borderRadius: "16px",
+                                        marginBottom: "12px",
+                                    }, children: SP_JSX.jsx(VkMusicIcon, { size: 48 }) }), SP_JSX.jsx("div", { style: { fontSize: "18px", fontWeight: 700, color: "#f8fafc", marginBottom: "6px" }, children: t("vkAuthHeader") }), SP_JSX.jsx("div", { style: {
+                                        fontSize: "13px",
+                                        color: "#94a3b8",
+                                        maxWidth: "500px",
+                                        lineHeight: "1.5",
+                                        whiteSpace: "pre-line",
+                                        marginBottom: "24px",
+                                    }, children: t("vkInstructions") }), SP_JSX.jsxs(DFL.DialogButton, { className: "deckymus-focus-btn", style: {
+                                        padding: "14px 28px",
+                                        backgroundColor: "#0073f7",
+                                        color: "#ffffff",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        gap: "10px",
+                                        fontWeight: 700,
+                                        fontSize: "14px",
+                                        borderRadius: "10px",
+                                        maxWidth: "320px",
+                                        width: "100%",
+                                    }, onClick: handleOpenBrowser, children: [SP_JSX.jsx(FaExternalLinkAlt, { size: 16 }), SP_JSX.jsx("span", { children: t("openInBrowser") })] })] }) }) })) : (
+                /* LOGGED IN: Full VK Music Experience */
+                SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: {
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "flex-start",
+                                    padding: "12px 16px",
+                                    backgroundColor: "rgba(0, 115, 247, 0.12)",
+                                    borderRadius: "10px",
+                                    border: "1px solid rgba(0, 115, 247, 0.25)",
+                                    width: "100%",
+                                    boxSizing: "border-box",
+                                    marginBottom: "14px",
+                                }, children: SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", gap: "12px", minWidth: 0, flex: 1 }, children: [vkStatus.avatar ? (SP_JSX.jsx("img", { src: vkStatus.avatar, alt: "Avatar", style: { width: "38px", height: "38px", borderRadius: "50%", objectFit: "cover", flexShrink: 0 } })) : (SP_JSX.jsx("div", { style: {
+                                                width: "38px",
+                                                height: "38px",
+                                                borderRadius: "50%",
+                                                backgroundColor: "#0073f7",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                color: "#fff",
+                                                fontWeight: 700,
+                                                flexShrink: 0,
+                                            }, children: "VK" })), SP_JSX.jsxs("div", { style: { minWidth: 0, overflow: "hidden" }, children: [SP_JSX.jsx("div", { style: {
+                                                        fontSize: "15px",
+                                                        fontWeight: 600,
+                                                        color: "#f8fafc",
+                                                        whiteSpace: "nowrap",
+                                                        overflow: "hidden",
+                                                        textOverflow: "ellipsis",
+                                                    }, children: vkStatus.user_name }), SP_JSX.jsxs("div", { style: {
+                                                        fontSize: "11px",
+                                                        color: "#94a3b8",
+                                                        whiteSpace: "nowrap",
+                                                        overflow: "hidden",
+                                                        textOverflow: "ellipsis",
+                                                    }, children: ["ID: ", vkStatus.user_id] })] })] }) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.Focusable, { "flow-children": "row", style: { display: "flex", gap: "8px", width: "100%", marginBottom: "12px", alignItems: "center" }, children: [SP_JSX.jsx("div", { style: { flex: 1, minWidth: 0 }, children: SP_JSX.jsx(DFL.TextField, { value: searchQuery, onChange: (e) => setSearchQuery(e?.target?.value || ""), placeholder: t("searchVkPlaceholder"), onKeyDown: (e) => {
+                                                if (e.key === "Enter")
+                                                    handleSearch();
+                                            } }) }), SP_JSX.jsx(DFL.DialogButton, { className: "deckymus-focus-btn deckymus-search-btn", style: {
+                                            width: "40px",
+                                            minWidth: "40px",
+                                            height: "40px",
+                                            padding: "0",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            borderRadius: "8px",
+                                            flexShrink: 0,
+                                        }, onClick: handleSearch, disabled: loading, children: loading && activeView === "search" ? (SP_JSX.jsx(FaSpinner, { className: "spin", size: 14 })) : (SP_JSX.jsx(FaSearch, { size: 14 })) })] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.Focusable, { "flow-children": "row", style: { display: "flex", gap: "8px", width: "100%", marginBottom: "16px" }, children: [SP_JSX.jsxs(DFL.DialogButton, { className: "deckymus-focus-btn", style: {
+                                            flex: 1,
+                                            padding: "8px 12px",
+                                            backgroundColor: activeView === "my_music" ? "rgba(0, 115, 247, 0.4)" : "rgba(255, 255, 255, 0.05)",
+                                            border: activeView === "my_music" ? "1px solid #0073f7" : "1px solid transparent",
+                                            fontWeight: activeView === "my_music" ? 700 : 500,
+                                        }, onClick: () => {
+                                            setActiveView("my_music");
+                                            cachedVkView = "my_music";
+                                            if (tracks.length === 0)
+                                                loadMyMusic();
+                                        }, children: [SP_JSX.jsx(FaMusic, { size: 12, style: { marginRight: "6px" } }), SP_JSX.jsx("span", { children: t("myMusic") })] }), SP_JSX.jsxs(DFL.DialogButton, { className: "deckymus-focus-btn", style: {
+                                            flex: 1,
+                                            padding: "8px 12px",
+                                            backgroundColor: activeView === "playlists" || activeView === "playlist_tracks"
+                                                ? "rgba(0, 115, 247, 0.4)"
+                                                : "rgba(255, 255, 255, 0.05)",
+                                            border: activeView === "playlists" || activeView === "playlist_tracks"
+                                                ? "1px solid #0073f7"
+                                                : "1px solid transparent",
+                                            fontWeight: activeView === "playlists" || activeView === "playlist_tracks" ? 700 : 500,
+                                        }, onClick: () => {
+                                            setActiveView("playlists");
+                                            cachedVkView = "playlists";
+                                            if (playlists.length === 0)
+                                                loadPlaylists();
+                                        }, children: [SP_JSX.jsx(FaListUl, { size: 12, style: { marginRight: "6px" } }), SP_JSX.jsx("span", { children: t("myPlaylists") })] }), searchResults.length > 0 && (SP_JSX.jsxs(DFL.DialogButton, { className: "deckymus-focus-btn", style: {
+                                            flex: 1,
+                                            padding: "8px 12px",
+                                            backgroundColor: activeView === "search" ? "rgba(0, 115, 247, 0.4)" : "rgba(255, 255, 255, 0.05)",
+                                            border: activeView === "search" ? "1px solid #0073f7" : "1px solid transparent",
+                                            fontWeight: activeView === "search" ? 700 : 500,
+                                        }, onClick: () => {
+                                            setActiveView("search");
+                                            cachedVkView = "search";
+                                        }, children: [SP_JSX.jsx(FaSearch, { size: 12, style: { marginRight: "6px" } }), SP_JSX.jsx("span", { children: t("searchResults") })] }))] }) }), activeView === "playlist_tracks" && selectedPlaylist && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: {
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    width: "100%",
+                                    marginBottom: "12px",
+                                }, children: [SP_JSX.jsxs(DFL.DialogButton, { style: { padding: "6px 12px", fontSize: "12px", display: "flex", alignItems: "center", gap: "6px" }, onClick: () => setActiveView("playlists"), children: [SP_JSX.jsx(FaArrowLeft, { size: 11 }), SP_JSX.jsx("span", { children: t("backToPlaylists") })] }), SP_JSX.jsx("span", { style: { fontSize: "14px", fontWeight: 700, color: "#f8fafc" }, children: selectedPlaylist.title })] }) })), activeView === "playlists" && (SP_JSX.jsx(DFL.PanelSectionRow, { children: playlists.length === 0 && !loading ? (SP_JSX.jsx("div", { style: { textAlign: "center", padding: "30px", color: "#94a3b8", width: "100%" }, children: t("noPlaylistsFound") })) : (SP_JSX.jsx("div", { style: {
+                                    display: "grid",
+                                    gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
+                                    gap: "12px",
+                                    width: "100%",
+                                }, children: playlists.map((pl) => (SP_JSX.jsxs("div", { tabIndex: 0, className: "deckymus-playlist-card", onClick: () => openPlaylist(pl), onKeyDown: (e) => {
+                                        if (e.key === "Enter")
+                                            openPlaylist(pl);
+                                    }, style: {
+                                        backgroundColor: "rgba(255, 255, 255, 0.04)",
+                                        border: "1px solid rgba(255, 255, 255, 0.08)",
+                                        borderRadius: "10px",
+                                        padding: "10px",
+                                        cursor: "pointer",
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        alignItems: "center",
+                                        textAlign: "center",
+                                        transition: "background-color 0.2s",
+                                    }, children: [pl.cover ? (SP_JSX.jsx("img", { src: pl.cover, alt: pl.title, style: {
+                                                width: "100%",
+                                                aspectRatio: "1/1",
+                                                borderRadius: "8px",
+                                                objectFit: "cover",
+                                                marginBottom: "8px",
+                                            } })) : (SP_JSX.jsx("div", { style: {
+                                                width: "100%",
+                                                aspectRatio: "1/1",
+                                                borderRadius: "8px",
+                                                backgroundColor: "rgba(0, 115, 247, 0.2)",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                marginBottom: "8px",
+                                                color: "#0073f7",
+                                            }, children: SP_JSX.jsx(FaListUl, { size: 32 }) })), SP_JSX.jsx("div", { style: {
+                                                fontSize: "13px",
+                                                fontWeight: 600,
+                                                color: "#f8fafc",
+                                                width: "100%",
+                                                overflow: "hidden",
+                                                textOverflow: "ellipsis",
+                                                whiteSpace: "nowrap",
+                                            }, children: pl.title }), SP_JSX.jsx("div", { style: { fontSize: "11px", color: "#94a3b8", marginTop: "2px" }, children: t("trackCount", pl.track_count) })] }, `${pl.owner_id}_${pl.id}`))) })) })), activeView !== "playlists" && (SP_JSX.jsx(DFL.PanelSectionRow, { children: loading && currentList.length === 0 ? (SP_JSX.jsxs("div", { style: { textAlign: "center", padding: "40px", color: "#94a3b8", width: "100%" }, children: [SP_JSX.jsx(FaSpinner, { className: "spin", size: 24, style: { marginBottom: "10px" } }), SP_JSX.jsx("div", { children: t("loading") })] })) : currentList.length === 0 ? (SP_JSX.jsx("div", { style: { textAlign: "center", padding: "40px", color: "#94a3b8", width: "100%" }, children: t("noTracksFound") })) : (SP_JSX.jsx("div", { style: { display: "flex", flexDirection: "column", gap: "6px", width: "100%", padding: "4px 6px", boxSizing: "border-box" }, children: currentList.map((track, idx) => {
+                                    const isPlaying = status.playback_status === "Playing" &&
+                                        status.track?.title === track.title &&
+                                        status.track?.artist === track.artist;
+                                    const isCurrentPaused = status.playback_status === "Paused" &&
+                                        status.track?.title === track.title &&
+                                        status.track?.artist === track.artist;
+                                    const downloaded = isDownloaded(track);
+                                    const downloading = downloadingIds.has(String(track.id));
+                                    return (SP_JSX.jsxs(DFL.Focusable, { "flow-children": "row", style: {
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "6px",
+                                            width: "100%",
+                                            boxSizing: "border-box",
+                                        }, children: [SP_JSX.jsxs(DFL.Focusable, { className: "deckymus-focus-btn", onActivate: () => {
+                                                    if (isPlaying) {
+                                                        rpcPlayPause().then(onRefresh);
+                                                    }
+                                                    else if (isCurrentPaused) {
+                                                        rpcPlayPause().then(onRefresh);
+                                                    }
+                                                    else {
+                                                        handlePlayTrack(currentList, idx);
+                                                    }
+                                                }, style: {
+                                                    flex: 1,
+                                                    minWidth: 0,
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    padding: "8px 12px",
+                                                    backgroundColor: isPlaying
+                                                        ? "rgba(0, 115, 247, 0.2)"
+                                                        : "rgba(255, 255, 255, 0.03)",
+                                                    border: isPlaying ? "1px solid #0073f7" : "1px solid rgba(255, 255, 255, 0.06)",
+                                                    borderRadius: "8px",
+                                                    gap: "10px",
+                                                    cursor: "pointer",
+                                                }, children: [SP_JSX.jsx("div", { style: {
+                                                            minWidth: "36px",
+                                                            width: "36px",
+                                                            height: "36px",
+                                                            borderRadius: "50%",
+                                                            backgroundColor: isPlaying ? "#0073f7" : "rgba(255, 255, 255, 0.1)",
+                                                            color: "#fff",
+                                                            display: "flex",
+                                                            alignItems: "center",
+                                                            justifyContent: "center",
+                                                            flexShrink: 0,
+                                                        }, children: loadingTrackIdx === idx ? (SP_JSX.jsx(FaSpinner, { className: "spin", size: 12 })) : isPlaying ? (SP_JSX.jsx(FaPause, { size: 12 })) : (SP_JSX.jsx(FaPlay, { size: 12, style: { marginLeft: "2px" } })) }), track.art_url ? (SP_JSX.jsx("img", { src: track.art_url, alt: track.title, style: { width: "38px", height: "38px", borderRadius: "6px", objectFit: "cover", flexShrink: 0 } })) : (SP_JSX.jsx("div", { style: {
+                                                            width: "38px",
+                                                            height: "38px",
+                                                            borderRadius: "6px",
+                                                            backgroundColor: "rgba(255, 255, 255, 0.08)",
+                                                            display: "flex",
+                                                            alignItems: "center",
+                                                            justifyContent: "center",
+                                                            color: "#94a3b8",
+                                                            flexShrink: 0,
+                                                        }, children: SP_JSX.jsx(FaMusic, { size: 14 }) })), SP_JSX.jsxs("div", { style: { flex: 1, minWidth: 0 }, children: [SP_JSX.jsx("div", { style: {
+                                                                    fontSize: "14px",
+                                                                    fontWeight: 600,
+                                                                    color: isPlaying ? "#60a5fa" : "#f8fafc",
+                                                                    overflow: "hidden",
+                                                                    textOverflow: "ellipsis",
+                                                                    whiteSpace: "nowrap",
+                                                                }, children: track.title }), SP_JSX.jsx("div", { style: {
+                                                                    fontSize: "12px",
+                                                                    color: "#94a3b8",
+                                                                    overflow: "hidden",
+                                                                    textOverflow: "ellipsis",
+                                                                    whiteSpace: "nowrap",
+                                                                }, children: track.artist || t("unknownArtist") })] }), SP_JSX.jsx("div", { style: { fontSize: "12px", color: "#64748b", minWidth: "40px", textAlign: "right", flexShrink: 0 }, children: formatDuration$3(track.duration) })] }), SP_JSX.jsx(DFL.DialogButton, { className: "deckymus-focus-btn", style: {
+                                                    minWidth: "36px",
+                                                    width: "36px",
+                                                    height: "44px",
+                                                    padding: "0",
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    justifyContent: "center",
+                                                    borderRadius: "8px",
+                                                    backgroundColor: downloaded
+                                                        ? "rgba(34, 197, 94, 0.2)"
+                                                        : "rgba(255, 255, 255, 0.06)",
+                                                    border: downloaded ? "1px solid rgba(34, 197, 94, 0.4)" : "1px solid rgba(255, 255, 255, 0.08)",
+                                                    color: downloaded ? "#4ade80" : "#cbd5e1",
+                                                    flexShrink: 0,
+                                                }, disabled: downloading, onClick: () => handleDownload(track), children: downloading ? (SP_JSX.jsx(FaSpinner, { className: "spin", size: 12 })) : downloaded ? (SP_JSX.jsx(FaCheck, { size: 12 })) : (SP_JSX.jsx(FaDownload, { size: 12 })) })] }, `${track.id || idx}_${track.title}`));
+                                }) })) }))] }))] }) }));
 };
 
 // Module-level persistent cache across tab navigation
@@ -4379,7 +5341,7 @@ let cachedYandexPlaylists = [];
 let cachedYandexTracks = [];
 let cachedSelectedPlaylistName = "";
 let cachedSelectedPlaylistId = "chart";
-const formatDuration$1 = (seconds) => {
+const formatDuration$2 = (seconds) => {
     if (!seconds || seconds <= 0)
         return "--:--";
     const m = Math.floor(seconds / 60);
@@ -4389,16 +5351,15 @@ const formatDuration$1 = (seconds) => {
 const YandexMusicTab = ({ status, onRefresh }) => {
     const { t } = useTranslation();
     const [yandexStatus, setYandexStatus] = SP_REACT.useState({ has_token: false, logged_in: false, user_name: "" });
-    const [tokenInput, setTokenInput] = SP_REACT.useState("");
     const [playlists, setPlaylists] = SP_REACT.useState(cachedYandexPlaylists);
     const [tracks, setTracks] = SP_REACT.useState(cachedYandexTracks);
     const [selectedPlaylistId, setSelectedPlaylistId] = SP_REACT.useState(cachedSelectedPlaylistId);
     const [selectedPlaylistName, setSelectedPlaylistName] = SP_REACT.useState(cachedSelectedPlaylistName || t("chartTitle"));
     const [loading, setLoading] = SP_REACT.useState(false);
-    const [msg, setMsg] = SP_REACT.useState("");
     const [statusMsg, setStatusMsg] = SP_REACT.useState("");
     const [statusIsError, setStatusIsError] = SP_REACT.useState(false);
     const [loadingTrackIdx, setLoadingTrackIdx] = SP_REACT.useState(null);
+    const [tokenInput, setTokenInput] = SP_REACT.useState("");
     // Download state tracking
     const [downloadedIds, setDownloadedIds] = SP_REACT.useState(new Set());
     const [downloadedNames, setDownloadedNames] = SP_REACT.useState(new Set());
@@ -4535,33 +5496,38 @@ const YandexMusicTab = ({ status, onRefresh }) => {
             setLoading(false);
         }
     };
-    const handleLogin = async () => {
-        if (!tokenInput.trim())
+    const openBrowser = async () => {
+        if (yandexStatus.auth_url) {
+            await openExternalAuthUrl(yandexStatus.auth_url);
+        }
+    };
+    const handleOpenBrowser = openBrowser;
+    const handleSaveToken = async () => {
+        let tVal = tokenInput.trim();
+        const m = tVal.match(/access_token[=:]+([^&\s#"']+)/);
+        if (m)
+            tVal = m[1];
+        if (!tVal)
             return;
         setLoading(true);
-        setMsg("");
         try {
-            const res = await rpcYandexSetToken(tokenInput.trim());
+            const res = await rpcYandexSetToken(tVal);
             if (res && res.success) {
                 setTokenInput("");
-                setMsg(t("connectedAs", res.user));
                 await loadStatus();
             }
             else {
-                setMsg(res?.error || t("downloadError", "Auth error"));
+                setStatusIsError(true);
+                setStatusMsg(res?.error || "Не удалось сохранить токен");
+                setTimeout(() => setStatusMsg(""), 4000);
             }
         }
         catch (e) {
-            setMsg(t("downloadError", "Failed to connect"));
+            console.error("Save Yandex token error:", e);
         }
         finally {
             setLoading(false);
         }
-    };
-    const handleLogout = async () => {
-        await rpcYandexSetToken("");
-        await loadStatus();
-        loadChart();
     };
     const handlePlayTrack = async (index) => {
         const t = tracks[index];
@@ -4591,7 +5557,30 @@ const YandexMusicTab = ({ status, onRefresh }) => {
     SP_REACT.useEffect(() => {
         loadStatus();
         loadDownloaded();
-    }, []);
+        const interval = setInterval(async () => {
+            if (!yandexStatus.logged_in) {
+                const s = await rpcYandexGetStatus();
+                if (s.logged_in) {
+                    setYandexStatus(s);
+                    loadPlaylists();
+                    try {
+                        if (typeof DFL.Navigation?.NavigateBack === "function") {
+                            DFL.Navigation.NavigateBack();
+                        }
+                        const sc = window.SteamClient;
+                        if (typeof sc?.Overlay?.CloseOverlay === "function") {
+                            sc.Overlay.CloseOverlay();
+                        }
+                    }
+                    catch (e) { }
+                }
+                else if (s.user_code && s.user_code !== yandexStatus.user_code) {
+                    setYandexStatus(s);
+                }
+            }
+        }, 1200);
+        return () => clearInterval(interval);
+    }, [yandexStatus.logged_in]);
     return (SP_JSX.jsxs("div", { style: {
             padding: "16px 20px",
             width: "100%",
@@ -4607,22 +5596,129 @@ const YandexMusicTab = ({ status, onRefresh }) => {
         .deckymus-spin {
           animation: deckymus-spin 1s linear infinite;
         }
-      ` }), SP_JSX.jsxs(DFL.PanelSection, { title: t("yandexSectionTitle"), children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: {
+      ` }), SP_JSX.jsxs(DFL.PanelSection, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: {
                                 display: "flex",
-                                justifyContent: "space-between",
                                 alignItems: "center",
-                                padding: "12px 16px",
-                                backgroundColor: "rgba(0, 0, 0, 0.3)",
+                                gap: "10px",
+                                padding: "8px 14px",
+                                backgroundColor: "rgba(234, 179, 8, 0.12)",
+                                border: "1px solid rgba(234, 179, 8, 0.3)",
                                 borderRadius: "8px",
                                 marginBottom: "12px",
+                                fontSize: "12px",
+                                color: "#fef08a",
                                 width: "100%",
-                            }, children: [SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", gap: "10px" }, children: [SP_JSX.jsx(YandexMusicIcon, { size: 24 }), SP_JSX.jsx("div", { children: yandexStatus.logged_in ? (SP_JSX.jsxs("div", { children: [SP_JSX.jsx("div", { style: { fontSize: "14px", fontWeight: "bold", color: "#facc15" }, children: t("connectedAs", yandexStatus.user_name) }), SP_JSX.jsx("div", { style: { fontSize: "11px", color: "#94a3b8" }, children: t("playlistsTitle") })] })) : (SP_JSX.jsxs("div", { children: [SP_JSX.jsx("div", { style: { fontSize: "14px", fontWeight: "bold", color: "#f8fafc" }, children: t("chartTitle") }), SP_JSX.jsx("div", { style: { fontSize: "11px", color: "#94a3b8" }, children: t("authDesc") })] })) })] }), yandexStatus.logged_in && (SP_JSX.jsx(DFL.DialogButton, { onClick: handleLogout, style: { minWidth: 0, padding: "6px 12px", backgroundColor: "rgba(239, 68, 68, 0.2)" }, children: SP_JSX.jsx(FaSignOutAlt, { size: 12, color: "#f87171" }) }))] }) }), !yandexStatus.logged_in && (SP_JSX.jsxs(DFL.PanelSectionRow, { children: [SP_JSX.jsxs("div", { style: { display: "flex", gap: "10px", width: "100%", marginBottom: "16px", alignItems: "center" }, children: [SP_JSX.jsx("div", { style: { flex: 1 }, children: SP_JSX.jsx(DFL.TextField, { label: t("tokenFieldLabel"), value: tokenInput, onChange: (e) => setTokenInput(e.target.value) }) }), SP_JSX.jsx("div", { style: { width: "120px" }, children: SP_JSX.jsxs(DFL.DialogButton, { disabled: loading || !tokenInput, onClick: handleLogin, style: {
+                                boxSizing: "border-box",
+                            }, children: [SP_JSX.jsx("span", { style: {
+                                        backgroundColor: "#eab308",
+                                        color: "#000000",
+                                        fontWeight: 700,
+                                        fontSize: "10px",
+                                        padding: "2px 6px",
+                                        borderRadius: "4px",
+                                        letterSpacing: "0.5px",
+                                        flexShrink: 0,
+                                    }, children: "BETA" }), SP_JSX.jsx("span", { children: t("betaNotice") })] }) }), yandexStatus.logged_in && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: {
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                padding: "10px 14px",
+                                backgroundColor: "rgba(250, 204, 21, 0.12)",
+                                borderRadius: "10px",
+                                border: "1px solid rgba(250, 204, 21, 0.25)",
+                                width: "100%",
+                                boxSizing: "border-box",
+                                marginBottom: "14px",
+                                gap: "12px",
+                            }, children: SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", gap: "10px", minWidth: 0, flex: 1 }, children: [yandexStatus.avatar ? (SP_JSX.jsx("img", { src: yandexStatus.avatar, alt: "Avatar", style: { width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover", flexShrink: 0 } })) : (SP_JSX.jsx("div", { style: {
+                                            width: "36px",
+                                            height: "36px",
+                                            borderRadius: "50%",
+                                            backgroundColor: "#facc15",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            color: "#000",
+                                            fontWeight: 700,
+                                            flexShrink: 0,
+                                        }, children: "\u042F" })), SP_JSX.jsxs("div", { style: { minWidth: 0, overflow: "hidden" }, children: [SP_JSX.jsx("div", { style: {
+                                                    fontSize: "14px",
+                                                    fontWeight: 600,
+                                                    color: "#f8fafc",
+                                                    whiteSpace: "nowrap",
+                                                    overflow: "hidden",
+                                                    textOverflow: "ellipsis",
+                                                }, children: yandexStatus.user_name }), yandexStatus.user_id && (SP_JSX.jsxs("div", { style: {
+                                                    fontSize: "11px",
+                                                    color: "#94a3b8",
+                                                    whiteSpace: "nowrap",
+                                                    overflow: "hidden",
+                                                    textOverflow: "ellipsis",
+                                                }, children: ["ID: ", yandexStatus.user_id] }))] })] }) }) })), !yandexStatus.logged_in && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: {
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                padding: "28px 16px",
+                                textAlign: "center",
+                                background: "linear-gradient(180deg, rgba(250, 204, 21, 0.15) 0%, rgba(18, 18, 18, 0.4) 100%)",
+                                borderRadius: "12px",
+                                border: "1px solid rgba(250, 204, 21, 0.3)",
+                                margin: "8px 0 16px 0",
+                                width: "100%",
+                                boxSizing: "border-box",
+                            }, children: [SP_JSX.jsx("div", { style: { marginBottom: "14px" }, children: SP_JSX.jsx(YandexMusicIcon, { size: 56 }) }), SP_JSX.jsx("div", { style: { fontSize: "18px", fontWeight: "bold", color: "#f8fafc", marginBottom: "8px" }, children: t("yandexAuthHeader") }), SP_JSX.jsx("div", { style: {
+                                        fontSize: "13px",
+                                        color: "#94a3b8",
+                                        maxWidth: "460px",
+                                        lineHeight: "1.5",
+                                        marginBottom: "20px",
+                                        whiteSpace: "pre-line",
+                                    }, children: t("yandexInstructions") }), SP_JSX.jsxs("div", { style: {
+                                        display: "flex",
+                                        flexDirection: "row",
+                                        flexWrap: "wrap",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        gap: "20px",
+                                        marginBottom: "20px",
+                                        width: "100%",
+                                    }, children: [yandexStatus.qr_svg && (SP_JSX.jsx("div", { style: {
+                                                width: "150px",
+                                                height: "150px",
+                                                backgroundColor: "#ffffff",
+                                                padding: "8px",
+                                                borderRadius: "12px",
+                                                boxSizing: "border-box",
                                                 display: "flex",
                                                 alignItems: "center",
                                                 justifyContent: "center",
-                                                gap: "6px",
-                                                padding: "8px 0",
-                                            }, children: [SP_JSX.jsx(FaKey, { size: 12 }), SP_JSX.jsx("span", { children: loading ? t("searchingBtn") : t("loginBtn") })] }) })] }), msg && SP_JSX.jsx("div", { style: { fontSize: "12px", color: "#facc15", marginTop: "4px" }, children: msg })] })), statusMsg && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: {
+                                                boxShadow: "0 6px 20px rgba(0, 0, 0, 0.4)",
+                                            }, children: SP_JSX.jsx("div", { dangerouslySetInnerHTML: { __html: yandexStatus.qr_svg }, style: { width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" } }) })), SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "10px", minWidth: "200px", alignItems: "center" }, children: [SP_JSX.jsxs(DFL.DialogButton, { className: "deckymus-focus-btn", style: {
+                                                        width: "100%",
+                                                        padding: "14px 20px",
+                                                        backgroundColor: "#facc15",
+                                                        color: "#000000",
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        justifyContent: "center",
+                                                        gap: "8px",
+                                                        fontWeight: 700,
+                                                        borderRadius: "10px",
+                                                        fontSize: "14px",
+                                                    }, onClick: handleOpenBrowser, children: [SP_JSX.jsx(FaExternalLinkAlt, { size: 15 }), SP_JSX.jsx("span", { children: t("openInBrowser") })] }), SP_JSX.jsx("div", { style: { fontSize: "12px", color: "#64748b", textAlign: "center" }, children: t("scanQrWithPhone") })] })] }), SP_JSX.jsxs("div", { style: { width: "100%", maxWidth: "460px", marginTop: "8px" }, children: [SP_JSX.jsx("div", { style: { fontSize: "12px", color: "#94a3b8", marginBottom: "6px", textAlign: "left" }, children: t("pasteTokenOrUrl") }), SP_JSX.jsxs(DFL.Focusable, { "flow-children": "row", style: { display: "flex", alignItems: "center", gap: "8px", width: "100%" }, children: [SP_JSX.jsx("div", { style: { flex: 1 }, children: SP_JSX.jsx(DFL.TextField, { value: tokenInput, onChange: (e) => setTokenInput(e.target.value), placeholder: t("tokenFieldPlaceholder") || "access_token или ссылка" }) }), SP_JSX.jsx(DFL.DialogButton, { className: "deckymus-focus-btn", style: {
+                                                        minWidth: "40px",
+                                                        width: "40px",
+                                                        height: "40px",
+                                                        padding: "0",
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        justifyContent: "center",
+                                                        backgroundColor: "#22c55e",
+                                                        color: "#ffffff",
+                                                        borderRadius: "8px",
+                                                        flexShrink: 0,
+                                                    }, onClick: handleSaveToken, children: SP_JSX.jsx(FaCheck, { size: 14 }) })] })] })] }) })), statusMsg && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: {
                                 width: "100%",
                                 padding: "8px 14px",
                                 borderRadius: "8px",
@@ -4636,92 +5732,104 @@ const YandexMusicTab = ({ status, onRefresh }) => {
                                 fontSize: "13px",
                                 textAlign: "center",
                                 marginBottom: "8px",
-                            }, children: statusMsg }) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px", overflowX: "auto", paddingBottom: "8px", width: "100%" }, children: [SP_JSX.jsxs(DFL.DialogButton, { onClick: loadChart, style: {
+                            }, children: statusMsg }) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.Focusable, { "flow-children": "row", style: { display: "flex", gap: "8px", overflowX: "auto", paddingBottom: "8px", width: "100%" }, children: [SP_JSX.jsxs(DFL.DialogButton, { className: "deckymus-focus-btn", onClick: loadChart, style: {
                                         minWidth: "auto",
                                         whiteSpace: "nowrap",
                                         padding: "6px 12px",
                                         backgroundColor: selectedPlaylistId === "chart" ? "#facc15" : undefined,
                                         color: selectedPlaylistId === "chart" ? "#000" : undefined,
-                                    }, children: [SP_JSX.jsx(FaChartLine, { size: 12, style: { marginRight: "6px" } }), t("chartTitle")] }), playlists.map((pl) => (SP_JSX.jsxs(DFL.DialogButton, { onClick: () => loadPlaylistTracks(pl.id, pl.owner_id || "", pl.title), style: {
+                                    }, children: [SP_JSX.jsx(FaChartLine, { size: 12, style: { marginRight: "6px" } }), t("chartTitle")] }), playlists.map((pl) => (SP_JSX.jsxs(DFL.DialogButton, { className: "deckymus-focus-btn", onClick: () => loadPlaylistTracks(pl.id, pl.owner_id || "", pl.title), style: {
                                         minWidth: "auto",
                                         whiteSpace: "nowrap",
                                         padding: "6px 12px",
                                         backgroundColor: selectedPlaylistId === pl.id ? "#facc15" : undefined,
                                         color: selectedPlaylistId === pl.id ? "#000" : undefined,
-                                    }, children: [pl.id === "likes" ? (SP_JSX.jsx(FaHeart, { size: 12, style: { marginRight: "6px" } })) : (SP_JSX.jsx(FaListUl, { size: 12, style: { marginRight: "6px" } })), pl.title, " (", pl.track_count, ")"] }, pl.id)))] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { width: "100%", display: "flex", flexDirection: "column", gap: "6px" }, children: [SP_JSX.jsxs("div", { style: { fontSize: "13px", fontWeight: "bold", color: "#f8fafc", marginBottom: "6px" }, children: [selectedPlaylistId === "chart" ? t("chartTitle") : selectedPlaylistName, " (", tracks.length, ")"] }), loading && (SP_JSX.jsx("div", { style: { padding: "24px", textAlign: "center", color: "#94a3b8" }, children: t("loadingTracks") })), !loading && tracks.map((t, idx) => {
+                                    }, children: [pl.id === "likes" ? (SP_JSX.jsx(FaHeart, { size: 12, style: { marginRight: "6px" } })) : (SP_JSX.jsx(FaListUl, { size: 12, style: { marginRight: "6px" } })), pl.title, " (", pl.track_count, ")"] }, pl.id)))] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { width: "100%", display: "flex", flexDirection: "column", gap: "6px", padding: "4px 6px", boxSizing: "border-box" }, children: [SP_JSX.jsxs("div", { style: { fontSize: "13px", fontWeight: "bold", color: "#f8fafc", marginBottom: "6px" }, children: [selectedPlaylistId === "chart" ? t("chartTitle") : selectedPlaylistName, " (", tracks.length, ")"] }), loading && (SP_JSX.jsx("div", { style: { padding: "24px", textAlign: "center", color: "#94a3b8" }, children: t("loadingTracks") })), !loading && tracks.map((t, idx) => {
                                     const isCurrent = (t.id && status.track?.id === t.id) || (t.path && status.track?.path === t.path);
-                                    const isPlaying = status.playback_status === "Playing";
+                                    const isPlaying = isCurrent && status.playback_status === "Playing";
+                                    const isCurrentPaused = isCurrent && status.playback_status === "Paused";
                                     const isLoadingThis = loadingTrackIdx === idx;
                                     const isDown = isDownloaded(t);
                                     const isDowning = downloadingIds.has(String(t.id));
-                                    return (SP_JSX.jsxs("div", { style: {
+                                    return (SP_JSX.jsxs(DFL.Focusable, { "flow-children": "row", style: {
                                             display: "flex",
                                             alignItems: "center",
                                             gap: "6px",
                                             width: "100%",
-                                            minWidth: 0,
-                                            maxWidth: "100%",
                                             boxSizing: "border-box",
-                                            marginBottom: "4px",
-                                            overflow: "hidden",
-                                        }, children: [SP_JSX.jsxs(DFL.DialogButton, { onClick: () => handlePlayTrack(idx), style: {
-                                                    flex: "1 1 0%",
+                                        }, children: [SP_JSX.jsxs(DFL.Focusable, { className: "deckymus-focus-btn", onActivate: () => {
+                                                    if (isPlaying) {
+                                                        rpcPlayPause().then(onRefresh);
+                                                    }
+                                                    else if (isCurrentPaused) {
+                                                        rpcPlayPause().then(onRefresh);
+                                                    }
+                                                    else {
+                                                        handlePlayTrack(idx);
+                                                    }
+                                                }, style: {
+                                                    flex: 1,
                                                     minWidth: 0,
-                                                    maxWidth: !isDown ? "calc(100% - 44px)" : "100%",
-                                                    boxSizing: "border-box",
                                                     display: "flex",
                                                     alignItems: "center",
-                                                    justifyContent: "space-between",
                                                     padding: "8px 12px",
-                                                    backgroundColor: isCurrent ? "rgba(250, 204, 21, 0.25)" : "rgba(255, 255, 255, 0.04)",
-                                                    border: isCurrent ? "1px solid rgba(250, 204, 21, 0.6)" : "1px solid transparent",
-                                                    textAlign: "left",
-                                                    overflow: "hidden",
-                                                }, children: [SP_JSX.jsxs("div", { style: {
+                                                    backgroundColor: isPlaying
+                                                        ? "rgba(250, 204, 21, 0.2)"
+                                                        : "rgba(255, 255, 255, 0.03)",
+                                                    border: isPlaying ? "1px solid #facc15" : "1px solid rgba(255, 255, 255, 0.06)",
+                                                    borderRadius: "8px",
+                                                    gap: "10px",
+                                                    cursor: "pointer",
+                                                }, children: [SP_JSX.jsx("div", { style: {
+                                                            minWidth: "36px",
+                                                            width: "36px",
+                                                            height: "36px",
+                                                            borderRadius: "50%",
+                                                            backgroundColor: isPlaying ? "#facc15" : "rgba(255, 255, 255, 0.1)",
+                                                            color: isPlaying ? "#000" : "#fff",
                                                             display: "flex",
                                                             alignItems: "center",
-                                                            gap: "10px",
-                                                            minWidth: 0,
-                                                            flex: "1 1 0%",
-                                                            overflow: "hidden",
-                                                        }, children: [SP_JSX.jsx("div", { style: {
-                                                                    width: "42px",
-                                                                    height: "42px",
-                                                                    borderRadius: "6px",
+                                                            justifyContent: "center",
+                                                            flexShrink: 0,
+                                                        }, children: isLoadingThis ? (SP_JSX.jsx(FaSpinner, { className: "spin", size: 12 })) : isPlaying ? (SP_JSX.jsx(FaPause, { size: 12 })) : (SP_JSX.jsx(FaPlay, { size: 12, style: { marginLeft: "2px" } })) }), t.art_url ? (SP_JSX.jsx("img", { src: t.art_url, alt: "", style: { width: "38px", height: "38px", borderRadius: "6px", objectFit: "cover", flexShrink: 0 } })) : (SP_JSX.jsx("div", { style: {
+                                                            width: "38px",
+                                                            height: "38px",
+                                                            borderRadius: "6px",
+                                                            backgroundColor: "rgba(255, 255, 255, 0.08)",
+                                                            display: "flex",
+                                                            alignItems: "center",
+                                                            justifyContent: "center",
+                                                            color: "#facc15",
+                                                            flexShrink: 0,
+                                                        }, children: SP_JSX.jsx(YandexMusicIcon, { size: 20 }) })), SP_JSX.jsxs("div", { style: { flex: 1, minWidth: 0, overflow: "hidden" }, children: [SP_JSX.jsx("div", { style: {
+                                                                    fontSize: "14px",
+                                                                    fontWeight: 600,
+                                                                    color: isPlaying ? "#facc15" : "#f8fafc",
+                                                                    whiteSpace: "nowrap",
                                                                     overflow: "hidden",
-                                                                    backgroundColor: "rgba(0, 0, 0, 0.3)",
-                                                                    display: "flex",
-                                                                    alignItems: "center",
-                                                                    justifyContent: "center",
-                                                                    flexShrink: 0,
-                                                                }, children: t.art_url ? (SP_JSX.jsx("img", { src: t.art_url, alt: "", style: { width: "100%", height: "100%", objectFit: "cover" } })) : (SP_JSX.jsx(YandexMusicIcon, { size: 20 })) }), SP_JSX.jsxs("div", { style: { flex: "1 1 0%", minWidth: 0, overflow: "hidden" }, children: [SP_JSX.jsx("div", { style: {
-                                                                            fontSize: "13px",
-                                                                            fontWeight: 600,
-                                                                            color: isCurrent ? "#facc15" : "#f8fafc",
-                                                                            whiteSpace: "nowrap",
-                                                                            overflow: "hidden",
-                                                                            textOverflow: "ellipsis",
-                                                                        }, children: t.title }), SP_JSX.jsx("div", { style: {
-                                                                            fontSize: "11px",
-                                                                            color: "#94a3b8",
-                                                                            whiteSpace: "nowrap",
-                                                                            overflow: "hidden",
-                                                                            textOverflow: "ellipsis",
-                                                                        }, children: t.artist })] })] }), SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", gap: "8px", flexShrink: 0, marginLeft: "8px" }, children: [SP_JSX.jsx("span", { style: { fontSize: "11px", color: "#64748b" }, children: formatDuration$1(t.duration) }), isLoadingThis ? (SP_JSX.jsx(FaSpinner, { className: "deckymus-spin", size: 12, color: "#facc15" })) : isCurrent && isPlaying ? (SP_JSX.jsx(FaPause, { size: 11, color: "#facc15" })) : (SP_JSX.jsx(FaPlay, { size: 11, color: isCurrent ? "#facc15" : "#94a3b8" }))] })] }), !isDown && (SP_JSX.jsx(DFL.DialogButton, { disabled: isDowning, onClick: () => handleDownload(t), style: {
-                                                    minWidth: "38px",
-                                                    maxWidth: "38px",
-                                                    width: "38px",
-                                                    height: "38px",
-                                                    padding: 0,
+                                                                    textOverflow: "ellipsis",
+                                                                }, children: t.title }), SP_JSX.jsx("div", { style: {
+                                                                    fontSize: "12px",
+                                                                    color: "#94a3b8",
+                                                                    whiteSpace: "nowrap",
+                                                                    overflow: "hidden",
+                                                                    textOverflow: "ellipsis",
+                                                                }, children: t.artist })] }), SP_JSX.jsx("div", { style: { fontSize: "12px", color: "#64748b", minWidth: "40px", textAlign: "right", flexShrink: 0 }, children: formatDuration$2(t.duration) })] }), SP_JSX.jsx(DFL.DialogButton, { className: "deckymus-focus-btn", style: {
+                                                    minWidth: "36px",
+                                                    width: "36px",
+                                                    height: "44px",
+                                                    padding: "0",
                                                     display: "flex",
                                                     alignItems: "center",
                                                     justifyContent: "center",
-                                                    backgroundColor: isDowning ? "rgba(59, 130, 246, 0.35)" : "rgba(255, 255, 255, 0.06)",
-                                                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                                                    borderRadius: "6px",
+                                                    borderRadius: "8px",
+                                                    backgroundColor: isDown
+                                                        ? "rgba(34, 197, 94, 0.2)"
+                                                        : "rgba(255, 255, 255, 0.06)",
+                                                    border: isDown ? "1px solid rgba(34, 197, 94, 0.4)" : "1px solid rgba(255, 255, 255, 0.08)",
+                                                    color: isDown ? "#4ade80" : "#cbd5e1",
                                                     flexShrink: 0,
-                                                    boxSizing: "border-box",
-                                                }, children: isDowning ? (SP_JSX.jsx(FaSpinner, { className: "deckymus-spin", size: 13, color: "#60a5fa" })) : (SP_JSX.jsx(FaDownload, { size: 12, color: "#94a3b8" })) }))] }, t.id || idx));
+                                                }, disabled: isDowning, onClick: () => handleDownload(t), children: isDowning ? (SP_JSX.jsx(FaSpinner, { className: "spin", size: 12 })) : isDown ? (SP_JSX.jsx(FaCheck, { size: 12 })) : (SP_JSX.jsx(FaDownload, { size: 12 })) })] }, t.id || idx));
                                 })] }) })] })] }));
 };
 
@@ -4729,7 +5837,7 @@ const YandexMusicTab = ({ status, onRefresh }) => {
 let cachedQuery = "";
 let cachedTracks = [];
 let cachedHasSearched = false;
-const formatDuration = (seconds) => {
+const formatDuration$1 = (seconds) => {
     if (!seconds || seconds <= 0)
         return "--:--";
     const m = Math.floor(seconds / 60);
@@ -4745,6 +5853,7 @@ const YouTubeMusicTab = ({ status, onRefresh }) => {
     const [loadingTrackIdx, setLoadingTrackIdx] = SP_REACT.useState(null);
     const [statusMsg, setStatusMsg] = SP_REACT.useState("");
     const [statusIsError, setStatusIsError] = SP_REACT.useState(false);
+    SP_REACT.useRef(null);
     // Download state tracking
     const [downloadedIds, setDownloadedIds] = SP_REACT.useState(new Set());
     const [downloadedNames, setDownloadedNames] = SP_REACT.useState(new Set());
@@ -4870,26 +5979,31 @@ const YouTubeMusicTab = ({ status, onRefresh }) => {
         .deckymus-spin {
           animation: deckymus-spin 1s linear infinite;
         }
-      ` }), SP_JSX.jsxs(DFL.PanelSection, { title: t("ytSectionTitle"), children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: {
+      ` }), SP_JSX.jsxs(DFL.PanelSection, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.Focusable, { "flow-children": "row", style: {
                                 display: "flex",
-                                gap: "10px",
+                                gap: "8px",
                                 width: "100%",
-                                minWidth: 0,
-                                maxWidth: "100%",
-                                boxSizing: "border-box",
                                 marginBottom: "12px",
                                 alignItems: "center",
-                            }, children: [SP_JSX.jsx("div", { style: { flex: "1 1 0%", minWidth: 0 }, children: SP_JSX.jsx(DFL.TextField, { label: t("ytSearchPlaceholder"), value: query, onChange: (e) => {
-                                            setQuery(e.target.value);
-                                            cachedQuery = e.target.value;
-                                        } }) }), SP_JSX.jsx("div", { style: { width: "120px", flexShrink: 0 }, children: SP_JSX.jsxs(DFL.DialogButton, { disabled: loading || !query.trim(), onClick: handleSearch, style: {
-                                            display: "flex",
-                                            alignItems: "center",
-                                            justifyContent: "center",
-                                            gap: "6px",
-                                            padding: "8px 0",
-                                            backgroundColor: "rgba(239, 68, 68, 0.3)",
-                                        }, children: [SP_JSX.jsx(FaSearch, { size: 12 }), SP_JSX.jsx("span", { children: loading ? t("searchingBtn") : t("searchBtn") })] }) })] }) }), statusMsg && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: {
+                            }, children: [SP_JSX.jsx("div", { style: { flex: 1, minWidth: 0 }, children: SP_JSX.jsx(DFL.TextField, { value: query, onChange: (e) => {
+                                            const val = e?.target?.value || "";
+                                            setQuery(val);
+                                            cachedQuery = val;
+                                        }, placeholder: t("ytSearchPlaceholder"), onKeyDown: (e) => {
+                                            if (e.key === "Enter")
+                                                handleSearch();
+                                        } }) }), SP_JSX.jsx(DFL.DialogButton, { className: "deckymus-focus-btn deckymus-search-btn", disabled: loading || !query.trim(), onClick: handleSearch, style: {
+                                        width: "40px",
+                                        minWidth: "40px",
+                                        height: "40px",
+                                        padding: "0",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        borderRadius: "8px",
+                                        backgroundColor: "rgba(239, 68, 68, 0.3)",
+                                        flexShrink: 0,
+                                    }, children: loading ? (SP_JSX.jsx(FaSpinner, { className: "spin", size: 14 })) : (SP_JSX.jsx(FaSearch, { size: 14 })) })] }) }), statusMsg && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: {
                                 width: "100%",
                                 padding: "8px 14px",
                                 borderRadius: "8px",
@@ -4910,8 +6024,8 @@ const YouTubeMusicTab = ({ status, onRefresh }) => {
                                 display: "flex",
                                 flexDirection: "column",
                                 gap: "6px",
+                                padding: "4px 6px",
                                 boxSizing: "border-box",
-                                overflowX: "hidden",
                             }, children: [loading && (SP_JSX.jsx("div", { style: { padding: "32px", textAlign: "center", color: "#94a3b8" }, children: t("ytSearching") })), !loading && hasSearched && tracks.length === 0 && (SP_JSX.jsx("div", { style: {
                                         padding: "32px",
                                         textAlign: "center",
@@ -4926,79 +6040,635 @@ const YouTubeMusicTab = ({ status, onRefresh }) => {
                                         color: "#94a3b8",
                                     }, children: [SP_JSX.jsx(FaYoutube, { size: 36, color: "#ef4444", style: { marginBottom: "8px", opacity: 0.8 } }), SP_JSX.jsx("div", { children: t("ytEnterQueryHint") })] })), !loading && tracks.map((t, idx) => {
                                     const isCurrent = status.track?.id === t.id;
-                                    const isPlaying = status.playback_status === "Playing";
+                                    const isPlaying = isCurrent && status.playback_status === "Playing";
+                                    const isCurrentPaused = isCurrent && status.playback_status === "Paused";
                                     const isLoadingThis = loadingTrackIdx === idx;
                                     const isDown = isDownloaded(t);
                                     const isDowning = downloadingIds.has(String(t.id));
-                                    return (SP_JSX.jsxs("div", { style: {
+                                    return (SP_JSX.jsxs(DFL.Focusable, { "flow-children": "row", style: {
                                             display: "flex",
                                             alignItems: "center",
                                             gap: "6px",
                                             width: "100%",
-                                            minWidth: 0,
-                                            maxWidth: "100%",
                                             boxSizing: "border-box",
-                                            marginBottom: "4px",
-                                            overflow: "hidden",
-                                        }, children: [SP_JSX.jsxs(DFL.DialogButton, { onClick: () => handlePlayTrack(idx), style: {
-                                                    flex: "1 1 0%",
+                                        }, children: [SP_JSX.jsxs(DFL.Focusable, { className: "deckymus-focus-btn", onActivate: () => {
+                                                    if (isPlaying) {
+                                                        rpcPlayPause().then(onRefresh);
+                                                    }
+                                                    else if (isCurrentPaused) {
+                                                        rpcPlayPause().then(onRefresh);
+                                                    }
+                                                    else {
+                                                        handlePlayTrack(idx);
+                                                    }
+                                                }, style: {
+                                                    flex: 1,
                                                     minWidth: 0,
-                                                    maxWidth: !isDown ? "calc(100% - 44px)" : "100%",
-                                                    boxSizing: "border-box",
                                                     display: "flex",
                                                     alignItems: "center",
-                                                    justifyContent: "space-between",
                                                     padding: "8px 12px",
-                                                    backgroundColor: isCurrent ? "rgba(239, 68, 68, 0.25)" : "rgba(255, 255, 255, 0.04)",
-                                                    border: isCurrent ? "1px solid rgba(239, 68, 68, 0.6)" : "1px solid transparent",
-                                                    textAlign: "left",
-                                                    overflow: "hidden",
-                                                }, children: [SP_JSX.jsxs("div", { style: {
+                                                    backgroundColor: isPlaying
+                                                        ? "rgba(239, 68, 68, 0.2)"
+                                                        : "rgba(255, 255, 255, 0.03)",
+                                                    border: isPlaying ? "1px solid #ef4444" : "1px solid rgba(255, 255, 255, 0.06)",
+                                                    borderRadius: "8px",
+                                                    gap: "10px",
+                                                    cursor: "pointer",
+                                                }, children: [SP_JSX.jsx("div", { style: {
+                                                            minWidth: "36px",
+                                                            width: "36px",
+                                                            height: "36px",
+                                                            borderRadius: "50%",
+                                                            backgroundColor: isPlaying ? "#ef4444" : "rgba(255, 255, 255, 0.1)",
+                                                            color: "#fff",
                                                             display: "flex",
                                                             alignItems: "center",
-                                                            gap: "10px",
-                                                            minWidth: 0,
-                                                            flex: "1 1 0%",
-                                                            overflow: "hidden",
-                                                        }, children: [SP_JSX.jsx("div", { style: {
-                                                                    width: "42px",
-                                                                    height: "42px",
-                                                                    borderRadius: "6px",
+                                                            justifyContent: "center",
+                                                            flexShrink: 0,
+                                                        }, children: isLoadingThis ? (SP_JSX.jsx(FaSpinner, { className: "spin", size: 12 })) : isPlaying ? (SP_JSX.jsx(FaPause, { size: 12 })) : (SP_JSX.jsx(FaPlay, { size: 12, style: { marginLeft: "2px" } })) }), t.art_url ? (SP_JSX.jsx("img", { src: t.art_url, alt: "", style: { width: "38px", height: "38px", borderRadius: "6px", objectFit: "cover", flexShrink: 0 } })) : (SP_JSX.jsx("div", { style: {
+                                                            width: "38px",
+                                                            height: "38px",
+                                                            borderRadius: "6px",
+                                                            backgroundColor: "rgba(255, 255, 255, 0.08)",
+                                                            display: "flex",
+                                                            alignItems: "center",
+                                                            justifyContent: "center",
+                                                            color: "#ef4444",
+                                                            flexShrink: 0,
+                                                        }, children: SP_JSX.jsx(FaYoutube, { size: 18 }) })), SP_JSX.jsxs("div", { style: { flex: 1, minWidth: 0, overflow: "hidden" }, children: [SP_JSX.jsx("div", { style: {
+                                                                    fontSize: "14px",
+                                                                    fontWeight: 600,
+                                                                    color: isPlaying ? "#f87171" : "#f8fafc",
+                                                                    whiteSpace: "nowrap",
                                                                     overflow: "hidden",
-                                                                    backgroundColor: "rgba(0, 0, 0, 0.3)",
-                                                                    display: "flex",
-                                                                    alignItems: "center",
-                                                                    justifyContent: "center",
-                                                                    flexShrink: 0,
-                                                                }, children: t.art_url ? (SP_JSX.jsx("img", { src: t.art_url, alt: "", style: { width: "100%", height: "100%", objectFit: "cover" } })) : (SP_JSX.jsx(FaYoutube, { size: 20, color: "#ef4444" })) }), SP_JSX.jsxs("div", { style: { flex: "1 1 0%", minWidth: 0, overflow: "hidden" }, children: [SP_JSX.jsx("div", { style: {
-                                                                            fontSize: "13px",
-                                                                            fontWeight: 600,
-                                                                            color: isCurrent ? "#f87171" : "#f8fafc",
-                                                                            whiteSpace: "nowrap",
-                                                                            overflow: "hidden",
-                                                                            textOverflow: "ellipsis",
-                                                                        }, children: t.title }), SP_JSX.jsx("div", { style: {
-                                                                            fontSize: "11px",
-                                                                            color: "#94a3b8",
-                                                                            whiteSpace: "nowrap",
-                                                                            overflow: "hidden",
-                                                                            textOverflow: "ellipsis",
-                                                                        }, children: t.artist })] })] }), SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", gap: "8px", flexShrink: 0, marginLeft: "8px" }, children: [SP_JSX.jsx("span", { style: { fontSize: "11px", color: "#64748b" }, children: formatDuration(t.duration) }), isLoadingThis ? (SP_JSX.jsx(FaSpinner, { className: "deckymus-spin", size: 12, color: "#f87171" })) : isCurrent && isPlaying ? (SP_JSX.jsx(FaPause, { size: 11, color: "#f87171" })) : (SP_JSX.jsx(FaPlay, { size: 11, color: isCurrent ? "#f87171" : "#94a3b8" }))] })] }), !isDown && (SP_JSX.jsx(DFL.DialogButton, { disabled: isDowning, onClick: () => handleDownload(t), style: {
-                                                    minWidth: "38px",
-                                                    maxWidth: "38px",
-                                                    width: "38px",
-                                                    height: "38px",
-                                                    padding: 0,
+                                                                    textOverflow: "ellipsis",
+                                                                }, children: t.title }), SP_JSX.jsx("div", { style: {
+                                                                    fontSize: "12px",
+                                                                    color: "#94a3b8",
+                                                                    whiteSpace: "nowrap",
+                                                                    overflow: "hidden",
+                                                                    textOverflow: "ellipsis",
+                                                                }, children: t.artist })] }), SP_JSX.jsx("div", { style: { fontSize: "12px", color: "#64748b", minWidth: "40px", textAlign: "right", flexShrink: 0 }, children: formatDuration$1(t.duration) })] }), SP_JSX.jsx(DFL.DialogButton, { className: "deckymus-focus-btn", style: {
+                                                    minWidth: "36px",
+                                                    width: "36px",
+                                                    height: "44px",
+                                                    padding: "0",
                                                     display: "flex",
                                                     alignItems: "center",
                                                     justifyContent: "center",
-                                                    backgroundColor: isDowning ? "rgba(59, 130, 246, 0.35)" : "rgba(255, 255, 255, 0.06)",
-                                                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                                                    borderRadius: "6px",
+                                                    borderRadius: "8px",
+                                                    backgroundColor: isDown
+                                                        ? "rgba(34, 197, 94, 0.2)"
+                                                        : "rgba(255, 255, 255, 0.06)",
+                                                    border: isDown ? "1px solid rgba(34, 197, 94, 0.4)" : "1px solid rgba(255, 255, 255, 0.08)",
+                                                    color: isDown ? "#4ade80" : "#cbd5e1",
                                                     flexShrink: 0,
-                                                    boxSizing: "border-box",
-                                                }, children: isDowning ? (SP_JSX.jsx(FaSpinner, { className: "deckymus-spin", size: 13, color: "#60a5fa" })) : (SP_JSX.jsx(FaDownload, { size: 12, color: "#94a3b8" })) }))] }, t.id || idx));
+                                                }, disabled: isDowning, onClick: () => handleDownload(t), children: isDowning ? (SP_JSX.jsx(FaSpinner, { className: "spin", size: 12 })) : isDown ? (SP_JSX.jsx(FaCheck, { size: 12 })) : (SP_JSX.jsx(FaDownload, { size: 12 })) })] }, t.id || idx));
                                 })] }) })] })] }));
+};
+
+// Persistent caches
+let cachedSpotifyLiked = [];
+let cachedSpotifyPlaylists = [];
+let cachedSpotifyView = "liked";
+let cachedSpotifySearchQuery = "";
+let cachedSpotifySearchResults = [];
+const formatDuration = (seconds) => {
+    if (!seconds || seconds <= 0)
+        return "--:--";
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s < 10 ? "0" : ""}${s}`;
+};
+const SpotifyTab = ({ status, onRefresh }) => {
+    const { t } = useTranslation();
+    const [spotifyStatus, setSpotifyStatus] = SP_REACT.useState({
+        has_token: false,
+        logged_in: false,
+        user_name: "",
+    });
+    const [activeView, setActiveView] = SP_REACT.useState(cachedSpotifyView);
+    const [likedTracks, setLikedTracks] = SP_REACT.useState(cachedSpotifyLiked);
+    const [playlists, setPlaylists] = SP_REACT.useState(cachedSpotifyPlaylists);
+    const [selectedPlaylist, setSelectedPlaylist] = SP_REACT.useState(null);
+    const [playlistTracks, setPlaylistTracks] = SP_REACT.useState([]);
+    const [searchQuery, setSearchQuery] = SP_REACT.useState(cachedSpotifySearchQuery);
+    const [searchResults, setSearchResults] = SP_REACT.useState(cachedSpotifySearchResults);
+    const [loading, setLoading] = SP_REACT.useState(false);
+    const [statusMsg, setStatusMsg] = SP_REACT.useState("");
+    const [statusIsError, setStatusIsError] = SP_REACT.useState(false);
+    const [loadingTrackIdx, setLoadingTrackIdx] = SP_REACT.useState(null);
+    // Downloads tracking
+    const [downloadedIds, setDownloadedIds] = SP_REACT.useState(new Set());
+    const [downloadedNames, setDownloadedNames] = SP_REACT.useState(new Set());
+    const [downloadingIds, setDownloadingIds] = SP_REACT.useState(new Set());
+    const loadDownloaded = async () => {
+        try {
+            const info = await rpcGetDownloadedInfo();
+            if (info) {
+                setDownloadedIds(new Set(info.ids || []));
+                setDownloadedNames(new Set(info.filenames || []));
+            }
+        }
+        catch (e) {
+            console.error("loadDownloaded error:", e);
+        }
+    };
+    const isDownloaded = (item) => {
+        if (item.id && downloadedIds.has(String(item.id)))
+            return true;
+        const cleanT = (item.title || "").toLowerCase().replace(/[\/\\*?:"<>|]/g, "").trim();
+        const cleanA = (item.artist || "").toLowerCase().replace(/[\/\\*?:"<>|]/g, "").trim();
+        const full = cleanA ? `${cleanA} - ${cleanT}` : cleanT;
+        return downloadedNames.has(full) || downloadedNames.has(cleanT);
+    };
+    const handleDownload = async (item) => {
+        const tid = String(item.id);
+        setDownloadingIds((prev) => new Set(prev).add(tid));
+        setStatusIsError(false);
+        setStatusMsg(t("downloadingTrack", item.title));
+        try {
+            const res = await rpcDownloadTrack(item);
+            if (res && res.success) {
+                setDownloadedIds((prev) => new Set(prev).add(tid));
+                const cleanT = (item.title || "").toLowerCase().replace(/[\/\\*?:"<>|]/g, "").trim();
+                const cleanA = (item.artist || "").toLowerCase().replace(/[\/\\*?:"<>|]/g, "").trim();
+                const full = cleanA ? `${cleanA} - ${cleanT}` : cleanT;
+                setDownloadedNames((prev) => new Set(prev).add(full));
+                setStatusIsError(false);
+                setStatusMsg(t("downloadSuccess", item.title));
+                setTimeout(() => setStatusMsg(""), 4000);
+            }
+            else {
+                setStatusIsError(true);
+                setStatusMsg(t("downloadError", res?.error || "Error"));
+                setTimeout(() => setStatusMsg(""), 4000);
+            }
+        }
+        catch (e) {
+            console.error("Download exception:", e);
+            setStatusIsError(true);
+            setStatusMsg(t("downloadError", "Exception"));
+            setTimeout(() => setStatusMsg(""), 4000);
+        }
+        finally {
+            setDownloadingIds((prev) => {
+                const next = new Set(prev);
+                next.delete(tid);
+                return next;
+            });
+        }
+    };
+    const loadStatus = async () => {
+        try {
+            const s = await rpcSpotifyGetStatus();
+            setSpotifyStatus(s);
+            if (s.logged_in) {
+                if (cachedSpotifyLiked.length === 0) {
+                    loadLikedTracks();
+                }
+            }
+        }
+        catch (e) {
+            console.error("Spotify status error:", e);
+        }
+    };
+    const loadLikedTracks = async () => {
+        setLoading(true);
+        try {
+            const res = await rpcSpotifyGetLikedTracks(0, 50);
+            const list = res || [];
+            setLikedTracks(list);
+            cachedSpotifyLiked = list;
+        }
+        catch (e) {
+            console.error("loadLikedTracks error:", e);
+        }
+        finally {
+            setLoading(false);
+        }
+    };
+    const loadPlaylists = async () => {
+        setLoading(true);
+        try {
+            const res = await rpcSpotifyGetPlaylists(0, 50);
+            const list = res || [];
+            setPlaylists(list);
+            cachedSpotifyPlaylists = list;
+        }
+        catch (e) {
+            console.error("loadPlaylists error:", e);
+        }
+        finally {
+            setLoading(false);
+        }
+    };
+    const openPlaylist = async (pl) => {
+        setSelectedPlaylist(pl);
+        setActiveView("playlist_tracks");
+        setLoading(true);
+        try {
+            const res = await rpcSpotifyGetPlaylistTracks(pl.id, 0, 100);
+            setPlaylistTracks(res || []);
+        }
+        catch (e) {
+            console.error("openPlaylist error:", e);
+            setPlaylistTracks([]);
+        }
+        finally {
+            setLoading(false);
+        }
+    };
+    const handleSearch = async () => {
+        const q = searchQuery.trim();
+        if (!q)
+            return;
+        setLoading(true);
+        setActiveView("search");
+        cachedSpotifyView = "search";
+        cachedSpotifySearchQuery = q;
+        try {
+            const res = await rpcSpotifySearch(q, 0, 50);
+            const list = res || [];
+            setSearchResults(list);
+            cachedSpotifySearchResults = list;
+        }
+        catch (e) {
+            console.error("Spotify search error:", e);
+            setSearchResults([]);
+        }
+        finally {
+            setLoading(false);
+        }
+    };
+    const openBrowser = async () => {
+        if (spotifyStatus.auth_url) {
+            await openExternalAuthUrl(spotifyStatus.auth_url);
+        }
+    };
+    const handleOpenBrowser = openBrowser;
+    const handlePlayTrack = async (targetList, index) => {
+        setLoadingTrackIdx(index);
+        try {
+            await rpcPlayQueue(targetList, index);
+            onRefresh();
+        }
+        catch (e) {
+            console.error("handlePlayTrack error:", e);
+        }
+        finally {
+            setLoadingTrackIdx(null);
+        }
+    };
+    SP_REACT.useRef(null);
+    SP_REACT.useEffect(() => {
+        loadStatus();
+        loadDownloaded();
+        const interval = setInterval(async () => {
+            // Periodically check if logged in via phone helper or browser session
+            if (!spotifyStatus.logged_in) {
+                const s = await rpcSpotifyGetStatus();
+                if (s.logged_in) {
+                    setSpotifyStatus(s);
+                    loadLikedTracks();
+                    try {
+                        if (typeof DFL.Navigation?.NavigateBack === "function") {
+                            DFL.Navigation.NavigateBack();
+                        }
+                        const sc = window.SteamClient;
+                        if (typeof sc?.Overlay?.CloseOverlay === "function") {
+                            sc.Overlay.CloseOverlay();
+                        }
+                    }
+                    catch (e) { }
+                }
+            }
+        }, 1200);
+        return () => clearInterval(interval);
+    }, [spotifyStatus.logged_in]);
+    const currentList = activeView === "liked"
+        ? likedTracks
+        : activeView === "playlist_tracks"
+            ? playlistTracks
+            : searchResults;
+    return (SP_JSX.jsx("div", { style: {
+            padding: "16px 20px",
+            width: "100%",
+            maxWidth: "850px",
+            margin: "0 auto",
+            boxSizing: "border-box",
+            overflowX: "hidden",
+        }, children: SP_JSX.jsxs(DFL.PanelSection, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: {
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "10px",
+                            padding: "8px 14px",
+                            backgroundColor: "rgba(234, 179, 8, 0.12)",
+                            border: "1px solid rgba(234, 179, 8, 0.3)",
+                            borderRadius: "8px",
+                            marginBottom: "12px",
+                            fontSize: "12px",
+                            color: "#fef08a",
+                            width: "100%",
+                            boxSizing: "border-box",
+                        }, children: [SP_JSX.jsx("span", { style: {
+                                    backgroundColor: "#eab308",
+                                    color: "#000000",
+                                    fontWeight: 700,
+                                    fontSize: "10px",
+                                    padding: "2px 6px",
+                                    borderRadius: "4px",
+                                    letterSpacing: "0.5px",
+                                    flexShrink: 0,
+                                }, children: "BETA" }), SP_JSX.jsx("span", { children: t("betaNotice") })] }) }), statusMsg && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: {
+                            width: "100%",
+                            padding: "10px 14px",
+                            borderRadius: "8px",
+                            backgroundColor: statusIsError ? "rgba(239, 68, 68, 0.2)" : "rgba(30, 215, 96, 0.2)",
+                            border: `1px solid ${statusIsError ? "rgba(239, 68, 68, 0.4)" : "rgba(30, 215, 96, 0.4)"}`,
+                            color: statusIsError ? "#f87171" : "#1ed760",
+                            fontSize: "13px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            marginBottom: "12px",
+                        }, children: [SP_JSX.jsx("span", { children: statusMsg }), SP_JSX.jsx(DFL.DialogButton, { style: { minWidth: "40px", padding: "4px 8px", fontSize: "11px" }, onClick: () => setStatusMsg(""), children: "\u2715" })] }) })), !spotifyStatus.logged_in ? (SP_JSX.jsx(SP_JSX.Fragment, { children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: {
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                padding: "24px 20px",
+                                backgroundColor: "rgba(30, 215, 96, 0.08)",
+                                borderRadius: "14px",
+                                border: "1px solid rgba(30, 215, 96, 0.25)",
+                                width: "100%",
+                                boxSizing: "border-box",
+                                marginBottom: "16px",
+                                textAlign: "center",
+                            }, children: [SP_JSX.jsx("div", { style: {
+                                        width: "64px",
+                                        height: "64px",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        backgroundColor: "transparent",
+                                        marginBottom: "12px",
+                                    }, children: SP_JSX.jsx(SpotifyIcon, { size: 56 }) }), SP_JSX.jsx("div", { style: { fontSize: "18px", fontWeight: 700, color: "#f8fafc", marginBottom: "6px" }, children: t("spotifyAuthHeader") }), SP_JSX.jsx("div", { style: {
+                                        fontSize: "13px",
+                                        color: "#94a3b8",
+                                        maxWidth: "500px",
+                                        lineHeight: "1.5",
+                                        whiteSpace: "pre-line",
+                                        marginBottom: "20px",
+                                    }, children: t("spotifyInstructions") }), SP_JSX.jsxs("div", { style: {
+                                        display: "flex",
+                                        flexDirection: "row",
+                                        flexWrap: "wrap",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        gap: "24px",
+                                        marginBottom: "20px",
+                                        width: "100%",
+                                    }, children: [spotifyStatus.qr_svg && (SP_JSX.jsx("div", { style: {
+                                                width: "170px",
+                                                height: "170px",
+                                                backgroundColor: "#ffffff",
+                                                padding: "10px",
+                                                borderRadius: "14px",
+                                                boxSizing: "border-box",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                boxShadow: "0 6px 20px rgba(0, 0, 0, 0.4)",
+                                            }, children: SP_JSX.jsx("div", { dangerouslySetInnerHTML: { __html: spotifyStatus.qr_svg }, style: { width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" } }) })), SP_JSX.jsx("div", { style: { display: "flex", flexDirection: "column", gap: "10px", minWidth: "220px" }, children: SP_JSX.jsxs(DFL.DialogButton, { className: "deckymus-focus-btn", style: {
+                                                    padding: "12px 18px",
+                                                    backgroundColor: "#1ed760",
+                                                    color: "#000000",
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    justifyContent: "center",
+                                                    gap: "8px",
+                                                    fontWeight: 700,
+                                                    borderRadius: "8px",
+                                                }, onClick: handleOpenBrowser, children: [SP_JSX.jsx(FaExternalLinkAlt, { size: 14 }), SP_JSX.jsx("span", { children: t("openInBrowser") })] }) })] })] }) }) })) : (
+                /* LOGGED IN: Full Spotify Experience */
+                SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: {
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    padding: "12px 16px",
+                                    backgroundColor: "rgba(30, 215, 96, 0.12)",
+                                    borderRadius: "10px",
+                                    border: "1px solid rgba(30, 215, 96, 0.3)",
+                                    width: "100%",
+                                    boxSizing: "border-box",
+                                    marginBottom: "14px",
+                                }, children: SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", gap: "12px", minWidth: 0, flex: 1 }, children: [spotifyStatus.avatar ? (SP_JSX.jsx("img", { src: spotifyStatus.avatar, alt: "Avatar", style: { width: "38px", height: "38px", borderRadius: "50%", objectFit: "cover", flexShrink: 0 } })) : (SP_JSX.jsx("div", { style: {
+                                                width: "38px",
+                                                height: "38px",
+                                                borderRadius: "50%",
+                                                backgroundColor: "rgba(0, 0, 0, 0.4)",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                flexShrink: 0,
+                                            }, children: SP_JSX.jsx(SpotifyIcon, { size: 28 }) })), SP_JSX.jsxs("div", { style: { minWidth: 0, overflow: "hidden" }, children: [SP_JSX.jsx("div", { style: {
+                                                        fontSize: "15px",
+                                                        fontWeight: 600,
+                                                        color: "#f8fafc",
+                                                        whiteSpace: "nowrap",
+                                                        overflow: "hidden",
+                                                        textOverflow: "ellipsis",
+                                                    }, children: spotifyStatus.user_name }), SP_JSX.jsxs("div", { style: {
+                                                        fontSize: "11px",
+                                                        color: "#1ed760",
+                                                        textTransform: "capitalize",
+                                                        whiteSpace: "nowrap",
+                                                        overflow: "hidden",
+                                                        textOverflow: "ellipsis",
+                                                    }, children: ["Spotify ", spotifyStatus.product || "Connected"] })] })] }) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.Focusable, { "flow-children": "row", style: { display: "flex", gap: "8px", width: "100%", marginBottom: "12px", alignItems: "center" }, children: [SP_JSX.jsx("div", { style: { flex: 1, minWidth: 0 }, children: SP_JSX.jsx(DFL.TextField, { value: searchQuery, onChange: (e) => setSearchQuery(e?.target?.value || ""), placeholder: t("searchSpotifyPlaceholder"), onKeyDown: (e) => {
+                                                if (e.key === "Enter")
+                                                    handleSearch();
+                                            } }) }), SP_JSX.jsx(DFL.DialogButton, { className: "deckymus-focus-btn deckymus-search-btn", style: {
+                                            width: "40px",
+                                            minWidth: "40px",
+                                            height: "40px",
+                                            padding: "0",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            borderRadius: "8px",
+                                            flexShrink: 0,
+                                        }, onClick: handleSearch, disabled: loading, children: loading && activeView === "search" ? (SP_JSX.jsx(FaSpinner, { className: "spin", size: 14 })) : (SP_JSX.jsx(FaSearch, { size: 14 })) })] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.Focusable, { "flow-children": "row", style: { display: "flex", gap: "8px", width: "100%", marginBottom: "16px" }, children: [SP_JSX.jsxs(DFL.DialogButton, { className: "deckymus-focus-btn", style: {
+                                            flex: 1,
+                                            padding: "8px 12px",
+                                            backgroundColor: activeView === "liked" ? "rgba(30, 215, 96, 0.3)" : "rgba(255, 255, 255, 0.05)",
+                                            border: activeView === "liked" ? "1px solid #1ed760" : "1px solid transparent",
+                                            fontWeight: activeView === "liked" ? 700 : 500,
+                                        }, onClick: () => {
+                                            setActiveView("liked");
+                                            cachedSpotifyView = "liked";
+                                            if (likedTracks.length === 0)
+                                                loadLikedTracks();
+                                        }, children: [SP_JSX.jsx(FaHeart, { size: 12, style: { marginRight: "6px", color: "#1ed760" } }), SP_JSX.jsx("span", { children: t("likedTracks") })] }), SP_JSX.jsxs(DFL.DialogButton, { className: "deckymus-focus-btn", style: {
+                                            flex: 1,
+                                            padding: "8px 12px",
+                                            backgroundColor: activeView === "playlists" || activeView === "playlist_tracks"
+                                                ? "rgba(30, 215, 96, 0.3)"
+                                                : "rgba(255, 255, 255, 0.05)",
+                                            border: activeView === "playlists" || activeView === "playlist_tracks"
+                                                ? "1px solid #1ed760"
+                                                : "1px solid transparent",
+                                            fontWeight: activeView === "playlists" || activeView === "playlist_tracks" ? 700 : 500,
+                                        }, onClick: () => {
+                                            setActiveView("playlists");
+                                            cachedSpotifyView = "playlists";
+                                            if (playlists.length === 0)
+                                                loadPlaylists();
+                                        }, children: [SP_JSX.jsx(FaListUl, { size: 12, style: { marginRight: "6px" } }), SP_JSX.jsx("span", { children: t("myPlaylists") })] }), searchResults.length > 0 && (SP_JSX.jsxs(DFL.DialogButton, { className: "deckymus-focus-btn", style: {
+                                            flex: 1,
+                                            padding: "8px 12px",
+                                            backgroundColor: activeView === "search" ? "rgba(30, 215, 96, 0.3)" : "rgba(255, 255, 255, 0.05)",
+                                            border: activeView === "search" ? "1px solid #1ed760" : "1px solid transparent",
+                                            fontWeight: activeView === "search" ? 700 : 500,
+                                        }, onClick: () => {
+                                            setActiveView("search");
+                                            cachedSpotifyView = "search";
+                                        }, children: [SP_JSX.jsx(FaSearch, { size: 12, style: { marginRight: "6px" } }), SP_JSX.jsx("span", { children: t("searchResults") })] }))] }) }), activeView === "playlist_tracks" && selectedPlaylist && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: {
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    width: "100%",
+                                    marginBottom: "12px",
+                                }, children: [SP_JSX.jsxs(DFL.DialogButton, { style: { padding: "6px 12px", fontSize: "12px", display: "flex", alignItems: "center", gap: "6px" }, onClick: () => setActiveView("playlists"), children: [SP_JSX.jsx(FaArrowLeft, { size: 11 }), SP_JSX.jsx("span", { children: t("backToPlaylists") })] }), SP_JSX.jsx("span", { style: { fontSize: "14px", fontWeight: 700, color: "#f8fafc" }, children: selectedPlaylist.title })] }) })), activeView === "playlists" && (SP_JSX.jsx(DFL.PanelSectionRow, { children: playlists.length === 0 && !loading ? (SP_JSX.jsx("div", { style: { textAlign: "center", padding: "30px", color: "#94a3b8", width: "100%" }, children: t("noPlaylistsFound") })) : (SP_JSX.jsx("div", { style: {
+                                    display: "grid",
+                                    gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
+                                    gap: "12px",
+                                    width: "100%",
+                                }, children: playlists.map((pl) => (SP_JSX.jsxs("div", { tabIndex: 0, className: "deckymus-playlist-card", onClick: () => openPlaylist(pl), onKeyDown: (e) => {
+                                        if (e.key === "Enter")
+                                            openPlaylist(pl);
+                                    }, style: {
+                                        backgroundColor: "rgba(255, 255, 255, 0.04)",
+                                        border: "1px solid rgba(255, 255, 255, 0.08)",
+                                        borderRadius: "10px",
+                                        padding: "10px",
+                                        cursor: "pointer",
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        alignItems: "center",
+                                        textAlign: "center",
+                                        transition: "background-color 0.2s",
+                                    }, children: [pl.cover ? (SP_JSX.jsx("img", { src: pl.cover, alt: pl.title, style: {
+                                                width: "100%",
+                                                aspectRatio: "1/1",
+                                                borderRadius: "8px",
+                                                objectFit: "cover",
+                                                marginBottom: "8px",
+                                            } })) : (SP_JSX.jsx("div", { style: {
+                                                width: "100%",
+                                                aspectRatio: "1/1",
+                                                borderRadius: "8px",
+                                                backgroundColor: "rgba(30, 215, 96, 0.15)",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                marginBottom: "8px",
+                                            }, children: SP_JSX.jsx(SpotifyIcon, { size: 36 }) })), SP_JSX.jsx("div", { style: {
+                                                fontSize: "13px",
+                                                fontWeight: 600,
+                                                color: "#f8fafc",
+                                                width: "100%",
+                                                overflow: "hidden",
+                                                textOverflow: "ellipsis",
+                                                whiteSpace: "nowrap",
+                                            }, children: pl.title }), SP_JSX.jsx("div", { style: { fontSize: "11px", color: "#94a3b8", marginTop: "2px" }, children: t("trackCount", pl.track_count) })] }, pl.id))) })) })), activeView !== "playlists" && (SP_JSX.jsx(DFL.PanelSectionRow, { children: loading && currentList.length === 0 ? (SP_JSX.jsxs("div", { style: { textAlign: "center", padding: "40px", color: "#94a3b8", width: "100%" }, children: [SP_JSX.jsx(FaSpinner, { className: "spin", size: 24, style: { marginBottom: "10px" } }), SP_JSX.jsx("div", { children: t("loading") })] })) : currentList.length === 0 ? (SP_JSX.jsx("div", { style: { textAlign: "center", padding: "40px", color: "#94a3b8", width: "100%" }, children: t("noTracksFound") })) : (SP_JSX.jsx("div", { style: { display: "flex", flexDirection: "column", gap: "6px", width: "100%", padding: "4px 6px", boxSizing: "border-box" }, children: currentList.map((track, idx) => {
+                                    const isPlaying = status.playback_status === "Playing" &&
+                                        status.track?.title === track.title &&
+                                        status.track?.artist === track.artist;
+                                    const isCurrentPaused = status.playback_status === "Paused" &&
+                                        status.track?.title === track.title &&
+                                        status.track?.artist === track.artist;
+                                    const downloaded = isDownloaded(track);
+                                    const downloading = downloadingIds.has(String(track.id));
+                                    return (SP_JSX.jsxs(DFL.Focusable, { "flow-children": "row", style: {
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "6px",
+                                            width: "100%",
+                                            boxSizing: "border-box",
+                                        }, children: [SP_JSX.jsxs(DFL.Focusable, { className: "deckymus-focus-btn", onActivate: () => {
+                                                    if (isPlaying) {
+                                                        rpcPlayPause().then(onRefresh);
+                                                    }
+                                                    else if (isCurrentPaused) {
+                                                        rpcPlayPause().then(onRefresh);
+                                                    }
+                                                    else {
+                                                        handlePlayTrack(currentList, idx);
+                                                    }
+                                                }, style: {
+                                                    flex: 1,
+                                                    minWidth: 0,
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    padding: "8px 12px",
+                                                    backgroundColor: isPlaying
+                                                        ? "rgba(30, 215, 96, 0.18)"
+                                                        : "rgba(255, 255, 255, 0.03)",
+                                                    border: isPlaying ? "1px solid #1ed760" : "1px solid rgba(255, 255, 255, 0.06)",
+                                                    borderRadius: "8px",
+                                                    gap: "10px",
+                                                    cursor: "pointer",
+                                                }, children: [SP_JSX.jsx("div", { style: {
+                                                            minWidth: "36px",
+                                                            width: "36px",
+                                                            height: "36px",
+                                                            borderRadius: "50%",
+                                                            backgroundColor: isPlaying ? "#1ed760" : "rgba(255, 255, 255, 0.1)",
+                                                            color: isPlaying ? "#000" : "#fff",
+                                                            display: "flex",
+                                                            alignItems: "center",
+                                                            justifyContent: "center",
+                                                            flexShrink: 0,
+                                                        }, children: loadingTrackIdx === idx ? (SP_JSX.jsx(FaSpinner, { className: "spin", size: 12 })) : isPlaying ? (SP_JSX.jsx(FaPause, { size: 12 })) : (SP_JSX.jsx(FaPlay, { size: 12, style: { marginLeft: "2px" } })) }), track.art_url ? (SP_JSX.jsx("img", { src: track.art_url, alt: track.title, style: { width: "38px", height: "38px", borderRadius: "6px", objectFit: "cover", flexShrink: 0 } })) : (SP_JSX.jsx("div", { style: {
+                                                            width: "38px",
+                                                            height: "38px",
+                                                            borderRadius: "6px",
+                                                            backgroundColor: "rgba(255, 255, 255, 0.08)",
+                                                            display: "flex",
+                                                            alignItems: "center",
+                                                            justifyContent: "center",
+                                                            flexShrink: 0,
+                                                        }, children: SP_JSX.jsx(SpotifyIcon, { size: 20 }) })), SP_JSX.jsxs("div", { style: { flex: 1, minWidth: 0 }, children: [SP_JSX.jsx("div", { style: {
+                                                                    fontSize: "14px",
+                                                                    fontWeight: 600,
+                                                                    color: isPlaying ? "#1ed760" : "#f8fafc",
+                                                                    overflow: "hidden",
+                                                                    textOverflow: "ellipsis",
+                                                                    whiteSpace: "nowrap",
+                                                                }, children: track.title }), SP_JSX.jsx("div", { style: {
+                                                                    fontSize: "12px",
+                                                                    color: "#94a3b8",
+                                                                    overflow: "hidden",
+                                                                    textOverflow: "ellipsis",
+                                                                    whiteSpace: "nowrap",
+                                                                }, children: track.artist || t("unknownArtist") })] }), SP_JSX.jsx("div", { style: { fontSize: "12px", color: "#64748b", minWidth: "40px", textAlign: "right", flexShrink: 0 }, children: formatDuration(track.duration) })] }), SP_JSX.jsx(DFL.DialogButton, { className: "deckymus-focus-btn", style: {
+                                                    minWidth: "36px",
+                                                    width: "36px",
+                                                    height: "44px",
+                                                    padding: "0",
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    justifyContent: "center",
+                                                    borderRadius: "8px",
+                                                    backgroundColor: downloaded
+                                                        ? "rgba(34, 197, 94, 0.2)"
+                                                        : "rgba(255, 255, 255, 0.06)",
+                                                    border: downloaded ? "1px solid rgba(34, 197, 94, 0.4)" : "1px solid rgba(255, 255, 255, 0.08)",
+                                                    color: downloaded ? "#4ade80" : "#cbd5e1",
+                                                    flexShrink: 0,
+                                                }, disabled: downloading, onClick: () => handleDownload(track), children: downloading ? (SP_JSX.jsx(FaSpinner, { className: "spin", size: 12 })) : downloaded ? (SP_JSX.jsx(FaCheck, { size: 12 })) : (SP_JSX.jsx(FaDownload, { size: 12 })) })] }, `${track.id || idx}_${track.title}`));
+                                }) })) }))] }))] }) }));
 };
 
 const SettingsTab = () => {
@@ -5007,11 +6677,49 @@ const SettingsTab = () => {
     const [downloadFolder, setDownloadFolder] = SP_REACT.useState("");
     const [saved, setSaved] = SP_REACT.useState(false);
     const [dlSaved, setDlSaved] = SP_REACT.useState(false);
+    // Accounts state
+    const [vkStatus, setVkStatus] = SP_REACT.useState(null);
+    const [yandexStatus, setYandexStatus] = SP_REACT.useState(null);
+    const [spotifyStatus, setSpotifyStatus] = SP_REACT.useState(null);
+    const [loggingOutService, setLoggingOutService] = SP_REACT.useState(null);
     // Folder browser state
     const [showBrowser, setShowBrowser] = SP_REACT.useState(false);
     const [browserMode, setBrowserMode] = SP_REACT.useState("library");
     const [browseData, setBrowseData] = SP_REACT.useState(null);
     const [browsing, setBrowsing] = SP_REACT.useState(false);
+    const loadAccounts = async () => {
+        try {
+            const [v, y, s] = await Promise.all([
+                rpcVkGetStatus().catch(() => null),
+                rpcYandexGetStatus().catch(() => null),
+                rpcSpotifyGetStatus().catch(() => null),
+            ]);
+            setVkStatus(v);
+            setYandexStatus(y);
+            setSpotifyStatus(s);
+        }
+        catch (e) {
+            console.error("loadAccounts error:", e);
+        }
+    };
+    const handleAccountLogout = async (service) => {
+        setLoggingOutService(service);
+        try {
+            if (service === "vk")
+                await rpcVkLogout();
+            else if (service === "yandex")
+                await rpcYandexLogout();
+            else if (service === "spotify")
+                await rpcSpotifyLogout();
+            await loadAccounts();
+        }
+        catch (e) {
+            console.error("Account logout error:", e);
+        }
+        finally {
+            setLoggingOutService(null);
+        }
+    };
     const loadData = async () => {
         try {
             const [fRes, dlRes] = await Promise.all([
@@ -5020,6 +6728,7 @@ const SettingsTab = () => {
             ]);
             setFolders(fRes || []);
             setDownloadFolder(dlRes || "");
+            await loadAccounts();
         }
         catch (e) {
             console.error("Load settings error:", e);
@@ -5082,7 +6791,97 @@ const SettingsTab = () => {
         setFolders(updated);
         await rpcSetLocalFolders(updated);
     };
-    return (SP_JSX.jsxs("div", { style: { padding: "16px 24px", maxWidth: "800px", margin: "0 auto" }, children: [SP_JSX.jsx(DFL.PanelSection, { title: t("languageSettingTitle"), children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { width: "100%", marginBottom: "12px" }, children: SP_JSX.jsx(DFL.DropdownItem, { label: SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", gap: "8px" }, children: [SP_JSX.jsx(FaGlobe, { size: 14, color: "#60a5fa" }), SP_JSX.jsx("span", { children: t("languageSettingTitle") })] }), description: t("languageSettingDesc"), menuLabel: t("languageSettingTitle"), rgOptions: SUPPORTED_LANGUAGES.map((l) => ({
+    const loggedInAccounts = [];
+    if (vkStatus && vkStatus.logged_in) {
+        loggedInAccounts.push({
+            service: "vk",
+            name: vkStatus.user_name || "VK User",
+            id: vkStatus.user_id ? `ID: ${vkStatus.user_id}` : "",
+            label: "VK Музыка",
+            avatar: vkStatus.avatar || "",
+            color: "#0073f7",
+            colorRgb: "0, 115, 247",
+            icon: SP_JSX.jsx(VkMusicIcon, { size: 20 }),
+        });
+    }
+    if (yandexStatus && yandexStatus.logged_in) {
+        loggedInAccounts.push({
+            service: "yandex",
+            name: yandexStatus.user_name || "Yandex User",
+            id: yandexStatus.user_id ? `ID: ${yandexStatus.user_id}` : "",
+            label: "Яндекс Музыка",
+            avatar: yandexStatus.avatar || "",
+            color: "#facc15",
+            colorRgb: "250, 204, 21",
+            icon: SP_JSX.jsx(YandexMusicIcon, { size: 20 }),
+        });
+    }
+    if (spotifyStatus && spotifyStatus.logged_in) {
+        loggedInAccounts.push({
+            service: "spotify",
+            name: spotifyStatus.user_name || "Spotify User",
+            id: spotifyStatus.product ? `Spotify ${spotifyStatus.product}` : (spotifyStatus.user_id ? `ID: ${spotifyStatus.user_id}` : ""),
+            label: "Spotify",
+            avatar: spotifyStatus.avatar || "",
+            color: "#1ed760",
+            colorRgb: "30, 215, 96",
+            icon: SP_JSX.jsx(SpotifyIcon, { size: 20 }),
+        });
+    }
+    return (SP_JSX.jsxs("div", { style: { padding: "16px 24px", maxWidth: "800px", margin: "0 auto" }, children: [SP_JSX.jsx("style", { children: `
+        .deckymus-account-row {
+          transition: transform 0.12s ease, filter 0.12s ease, box-shadow 0.12s ease, outline 0.12s ease, border-color 0.12s ease !important;
+          box-sizing: border-box !important;
+          outline: none !important;
+        }
+        .deckymus-account-row .DialogButton,
+        .deckymus-account-row button,
+        .deckymus-logout-btn {
+          width: auto !important;
+          min-width: 80px !important;
+          max-width: 95px !important;
+          flex: 0 0 auto !important;
+          height: 36px !important;
+          padding: 0 10px !important;
+          box-sizing: border-box !important;
+        }
+        .deckymus-account-row-vk:focus-within,
+        .deckymus-account-row-vk:focus,
+        .deckymus-account-row-vk:focus-visible,
+        .deckymus-account-row-vk.focused,
+        .deckymus-account-row-vk[data-focused="true"] {
+          outline: 2px solid #0073f7 !important;
+          outline-offset: 1px !important;
+          box-shadow: 0 0 14px rgba(0, 115, 247, 0.85), inset 0 0 4px rgba(255, 255, 255, 0.25) !important;
+          transform: scale(1.015) !important;
+          filter: brightness(1.2) !important;
+          border-color: #0073f7 !important;
+        }
+        .deckymus-account-row-yandex:focus-within,
+        .deckymus-account-row-yandex:focus,
+        .deckymus-account-row-yandex:focus-visible,
+        .deckymus-account-row-yandex.focused,
+        .deckymus-account-row-yandex[data-focused="true"] {
+          outline: 2px solid #facc15 !important;
+          outline-offset: 1px !important;
+          box-shadow: 0 0 14px rgba(250, 204, 21, 0.85), inset 0 0 4px rgba(255, 255, 255, 0.25) !important;
+          transform: scale(1.015) !important;
+          filter: brightness(1.2) !important;
+          border-color: #facc15 !important;
+        }
+        .deckymus-account-row-spotify:focus-within,
+        .deckymus-account-row-spotify:focus,
+        .deckymus-account-row-spotify:focus-visible,
+        .deckymus-account-row-spotify.focused,
+        .deckymus-account-row-spotify[data-focused="true"] {
+          outline: 2px solid #1ed760 !important;
+          outline-offset: 1px !important;
+          box-shadow: 0 0 14px rgba(30, 215, 96, 0.85), inset 0 0 4px rgba(255, 255, 255, 0.25) !important;
+          transform: scale(1.015) !important;
+          filter: brightness(1.2) !important;
+          border-color: #1ed760 !important;
+        }
+      ` }), SP_JSX.jsx(DFL.PanelSection, { title: t("languageSettingTitle"), children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { width: "100%", marginBottom: "12px" }, children: SP_JSX.jsx(DFL.DropdownItem, { label: SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", gap: "8px" }, children: [SP_JSX.jsx(FaGlobe, { size: 14, color: "#60a5fa" }), SP_JSX.jsx("span", { children: t("languageSettingTitle") })] }), description: t("languageSettingDesc"), menuLabel: t("languageSettingTitle"), rgOptions: SUPPORTED_LANGUAGES.map((l) => ({
                                 data: l.code,
                                 label: l.code === "auto" ? t("languageAuto") : l.name,
                             })), selectedOption: selectedCode, onChange: (opt) => setLanguage(opt?.data || opt) }) }) }) }), showBrowser && browseData && (SP_JSX.jsx(DFL.PanelSection, { title: browserMode === "download" ? t("modalTitleDownload") : t("modalTitleLibrary"), children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: {
@@ -5125,7 +6924,7 @@ const SettingsTab = () => {
                                             padding: "8px 12px",
                                             backgroundColor: "rgba(255, 255, 255, 0.03)",
                                             textAlign: "left",
-                                        }, children: [SP_JSX.jsx(FaFolder, { size: 12, color: "#60a5fa" }), SP_JSX.jsx("span", { style: { fontSize: "13px", color: "#f8fafc", overflow: "hidden", textOverflow: "ellipsis" }, children: sub.name })] }, sIdx)))] })] }) }) })), SP_JSX.jsx(DFL.PanelSection, { title: t("settingsSectionDownload"), children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { width: "100%", display: "flex", flexDirection: "column", gap: "8px" }, children: [SP_JSX.jsx("div", { style: { fontSize: "12px", color: "#94a3b8" }, children: t("settingsDownloadDesc") }), SP_JSX.jsx("div", { style: { width: "100%", marginBottom: "4px" }, children: SP_JSX.jsxs(DFL.DialogButton, { onClick: openDownloadBrowser, style: {
+                                        }, children: [SP_JSX.jsx(FaFolder, { size: 12, color: "#60a5fa" }), SP_JSX.jsx("span", { style: { fontSize: "13px", color: "#f8fafc", overflow: "hidden", textOverflow: "ellipsis" }, children: sub.name })] }, sIdx)))] })] }) }) })), SP_JSX.jsx(DFL.PanelSection, { title: t("settingsSectionDownload"), children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { width: "100%", display: "flex", flexDirection: "column", gap: "8px" }, children: [SP_JSX.jsx("div", { style: { fontSize: "12px", color: "#94a3b8" }, children: t("settingsDownloadDesc") }), SP_JSX.jsx("div", { style: { width: "100%", marginBottom: "4px" }, children: SP_JSX.jsxs(DFL.DialogButton, { className: "deckymus-focus-btn", onClick: openDownloadBrowser, style: {
                                         width: "100%",
                                         display: "flex",
                                         alignItems: "center",
@@ -5147,7 +6946,7 @@ const SettingsTab = () => {
                                             overflow: "hidden",
                                             textOverflow: "ellipsis",
                                             whiteSpace: "nowrap",
-                                        }, title: downloadFolder, children: downloadFolder || t("settingsNotSelected") })] }), dlSaved && (SP_JSX.jsx("div", { style: { fontSize: "12px", color: "#4ade80", textAlign: "center", marginTop: "2px" }, children: t("downloadFolderUpdated") }))] }) }) }), SP_JSX.jsxs(DFL.PanelSection, { title: t("settingsSectionLibrary"), children: [SP_JSX.jsxs(DFL.PanelSectionRow, { children: [SP_JSX.jsx("div", { style: { width: "100%", marginBottom: "12px" }, children: SP_JSX.jsxs(DFL.DialogButton, { onClick: openLibraryBrowser, style: {
+                                        }, title: downloadFolder, children: downloadFolder || t("settingsNotSelected") })] }), dlSaved && (SP_JSX.jsx("div", { style: { fontSize: "12px", color: "#4ade80", textAlign: "center", marginTop: "2px" }, children: t("downloadFolderUpdated") }))] }) }) }), SP_JSX.jsxs(DFL.PanelSection, { title: t("settingsSectionLibrary"), children: [SP_JSX.jsxs(DFL.PanelSectionRow, { children: [SP_JSX.jsx("div", { style: { width: "100%", marginBottom: "12px" }, children: SP_JSX.jsxs(DFL.DialogButton, { className: "deckymus-focus-btn", onClick: openLibraryBrowser, style: {
                                         width: "100%",
                                         display: "flex",
                                         alignItems: "center",
@@ -5156,7 +6955,7 @@ const SettingsTab = () => {
                                         padding: "12px 0",
                                         backgroundColor: "rgba(59, 130, 246, 0.3)",
                                         border: "1px solid rgba(59, 130, 246, 0.5)",
-                                    }, children: [SP_JSX.jsx(FaFolderOpen, { size: 16, color: "#60a5fa" }), SP_JSX.jsx("span", { style: { fontSize: "14px", fontWeight: "bold" }, children: t("selectAndAddFolderBtn") })] }) }), saved && (SP_JSX.jsx("div", { style: { fontSize: "12px", color: "#4ade80", marginBottom: "8px", textAlign: "center" }, children: t("folderAddedSuccess") }))] }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "8px", width: "100%" }, children: [SP_JSX.jsxs("div", { style: { fontSize: "12px", color: "#94a3b8", marginBottom: "2px" }, children: [t("foldersList"), " (", folders.length, "):"] }), folders.length === 0 && (SP_JSX.jsx("div", { style: { fontSize: "12px", color: "#64748b", padding: "8px 0" }, children: t("noAddedFolders") })), folders.map((f, idx) => (SP_JSX.jsxs("div", { style: {
+                                    }, children: [SP_JSX.jsx(FaFolderOpen, { size: 16, color: "#60a5fa" }), SP_JSX.jsx("span", { style: { fontSize: "14px", fontWeight: "bold" }, children: t("selectAndAddFolderBtn") })] }) }), saved && (SP_JSX.jsx("div", { style: { fontSize: "12px", color: "#4ade80", marginBottom: "8px", textAlign: "center" }, children: t("folderAddedSuccess") }))] }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "8px", width: "100%" }, children: [SP_JSX.jsxs("div", { style: { fontSize: "12px", color: "#94a3b8", marginBottom: "2px" }, children: [t("foldersList"), " (", folders.length, "):"] }), folders.length === 0 && (SP_JSX.jsx("div", { style: { fontSize: "12px", color: "#64748b", padding: "8px 0" }, children: t("noAddedFolders") })), folders.map((f, idx) => (SP_JSX.jsxs(DFL.Focusable, { "flow-children": "row", style: {
                                         display: "flex",
                                         justifyContent: "space-between",
                                         alignItems: "center",
@@ -5170,7 +6969,7 @@ const SettingsTab = () => {
                                                         textOverflow: "ellipsis",
                                                         overflow: "hidden",
                                                         whiteSpace: "nowrap",
-                                                    }, title: f, children: f })] }), SP_JSX.jsx(DFL.DialogButton, { onClick: () => handleRemoveFolder(idx), style: {
+                                                    }, title: f, children: f })] }), SP_JSX.jsx(DFL.DialogButton, { className: "deckymus-focus-btn deckymus-trash-btn", onClick: () => handleRemoveFolder(idx), style: {
                                                 minWidth: "36px",
                                                 width: "36px",
                                                 height: "36px",
@@ -5180,8 +6979,67 @@ const SettingsTab = () => {
                                                 justifyContent: "center",
                                                 backgroundColor: "rgba(239, 68, 68, 0.2)",
                                                 borderRadius: "6px",
-                                                flexShrink: 0,
-                                            }, children: SP_JSX.jsx(FaTrash, { size: 12, color: "#f87171" }) })] }, idx))), SP_JSX.jsx("div", { style: { fontSize: "11px", color: "#64748b", marginTop: "6px" }, children: t("autoScanNotice") })] }) })] })] }));
+                                                flex: "0 0 auto",
+                                            }, children: SP_JSX.jsx(FaTrash, { size: 12, color: "#f87171" }) })] }, idx))), SP_JSX.jsx("div", { style: { fontSize: "11px", color: "#64748b", marginTop: "6px" }, children: t("autoScanNotice") })] }) })] }), loggedInAccounts.length > 0 && (SP_JSX.jsx(DFL.PanelSection, { title: t("settingsSectionAccounts") || "Аккаунты", children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { display: "flex", flexDirection: "column", gap: "8px", width: "100%" }, children: loggedInAccounts.map((acc) => (SP_JSX.jsxs(DFL.Focusable, { "flow-children": "row", className: `deckymus-account-row deckymus-account-row-${acc.service}`, style: {
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                padding: "8px 12px",
+                                backgroundColor: "rgba(255, 255, 255, 0.04)",
+                                border: `1px solid rgba(${acc.colorRgb}, 0.25)`,
+                                borderRadius: "8px",
+                                gap: "12px",
+                                cursor: "default",
+                            }, children: [acc.avatar ? (SP_JSX.jsxs("div", { style: { position: "relative", width: "38px", height: "38px", flexShrink: 0 }, children: [SP_JSX.jsx("img", { src: acc.avatar, alt: "", style: { width: "38px", height: "38px", borderRadius: "8px", objectFit: "cover" } }), SP_JSX.jsx("div", { style: {
+                                                position: "absolute",
+                                                bottom: "-2px",
+                                                right: "-2px",
+                                                width: "16px",
+                                                height: "16px",
+                                                borderRadius: "4px",
+                                                backgroundColor: "#0f172a",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                            }, children: acc.icon })] })) : (SP_JSX.jsx("div", { style: {
+                                        width: "38px",
+                                        height: "38px",
+                                        borderRadius: "8px",
+                                        backgroundColor: `rgba(${acc.colorRgb}, 0.15)`,
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        color: acc.color,
+                                        flexShrink: 0,
+                                    }, children: acc.icon })), SP_JSX.jsxs("div", { style: { flex: "1 1 auto", minWidth: 0, overflow: "hidden" }, children: [SP_JSX.jsx("div", { style: {
+                                                fontSize: "14px",
+                                                fontWeight: "bold",
+                                                color: "#f8fafc",
+                                                overflow: "hidden",
+                                                textOverflow: "ellipsis",
+                                                whiteSpace: "nowrap",
+                                            }, children: acc.name }), SP_JSX.jsxs("div", { style: {
+                                                fontSize: "12px",
+                                                color: "#94a3b8",
+                                                overflow: "hidden",
+                                                textOverflow: "ellipsis",
+                                                whiteSpace: "nowrap",
+                                                marginTop: "2px",
+                                            }, children: [acc.label, " ", acc.id ? `• ${acc.id}` : ""] })] }), SP_JSX.jsxs(DFL.DialogButton, { className: "deckymus-focus-btn deckymus-logout-btn", onClick: () => handleAccountLogout(acc.service), disabled: loggingOutService === acc.service, style: {
+                                        minWidth: "80px",
+                                        maxWidth: "95px",
+                                        width: "auto",
+                                        height: "36px",
+                                        padding: "0 10px",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        gap: "6px",
+                                        backgroundColor: "rgba(239, 68, 68, 0.2)",
+                                        border: "1px solid rgba(239, 68, 68, 0.4)",
+                                        borderRadius: "6px",
+                                        flex: "0 0 auto",
+                                    }, children: [SP_JSX.jsx(FaSignOutAlt, { size: 13, color: "#f87171" }), SP_JSX.jsx("span", { style: { fontSize: "12px", fontWeight: "bold", color: "#f87171" }, children: loggingOutService === acc.service ? "..." : (t("logoutBtn") || "Выйти") })] })] }, acc.service))) }) }) }))] }));
 };
 
 const AboutTab = () => {
@@ -5215,7 +7073,7 @@ const AboutTab = () => {
                                                     backgroundColor: "rgba(59, 130, 246, 0.25)",
                                                     color: "#60a5fa",
                                                     border: "1px solid rgba(59, 130, 246, 0.4)",
-                                                }, children: "v0.9.1" })] }), SP_JSX.jsx("div", { style: { fontSize: "13px", color: "#94a3b8" }, children: t("aboutTagline") })] })] }) }) }), SP_JSX.jsx(DFL.PanelSection, { title: t("featuresTitle"), children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: {
+                                                }, children: "v0.9.2" })] }), SP_JSX.jsx("div", { style: { fontSize: "13px", color: "#94a3b8" }, children: t("aboutTagline") })] })] }) }) }), SP_JSX.jsx(DFL.PanelSection, { title: t("featuresTitle"), children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: {
                             display: "grid",
                             gridTemplateColumns: "repeat(2, 1fr)",
                             gap: "10px",
@@ -5313,7 +7171,7 @@ const FullDeckyMusView = () => {
         {
             title: t("tabVk"),
             icon: SP_JSX.jsx(VkMusicIcon, { size: 16 }),
-            content: SP_JSX.jsx(VkMusicTab, {}),
+            content: SP_JSX.jsx(VkMusicTab, { status: status, onRefresh: fetchStatus }),
             route: "/deckymus/vk",
         },
         {
@@ -5321,6 +7179,12 @@ const FullDeckyMusView = () => {
             icon: SP_JSX.jsx(YandexMusicIcon, { size: 16 }),
             content: SP_JSX.jsx(YandexMusicTab, { status: status, onRefresh: fetchStatus }),
             route: "/deckymus/yandex",
+        },
+        {
+            title: t("tabSpotify"),
+            icon: SP_JSX.jsx(SpotifyIcon, { size: 16 }),
+            content: SP_JSX.jsx(SpotifyTab, { status: status, onRefresh: fetchStatus }),
+            route: "/deckymus/spotify",
         },
         {
             title: t("tabYtmusic"),
@@ -5341,7 +7205,157 @@ const FullDeckyMusView = () => {
             route: "/deckymus/about",
         },
     ];
-    return (SP_JSX.jsx(DFL.SidebarNavigation, { title: "DeckyMus", showTitle: true, pages: pages }));
+    return (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx("style", { children: `
+        .deckymus-track-row {
+          transition: transform 0.12s ease, filter 0.12s ease, box-shadow 0.12s ease, outline 0.12s ease, border-color 0.12s ease !important;
+          box-sizing: border-box !important;
+          outline: none !important;
+          margin: 2px 2px !important;
+        }
+        .deckymus-track-row:focus-within,
+        .deckymus-track-row:focus,
+        .deckymus-track-row:focus-visible,
+        .deckymus-track-row.focused,
+        .deckymus-track-row[data-focused="true"] {
+          outline: 2px solid #3b82f6 !important;
+          outline-offset: 0px !important;
+          box-shadow: 0 0 14px rgba(59, 130, 246, 0.85), inset 0 0 4px rgba(255, 255, 255, 0.25) !important;
+          transform: scale(1.01) !important;
+          filter: brightness(1.2) !important;
+          border-color: #3b82f6 !important;
+          z-index: 2 !important;
+        }
+        .deckymus-playlist-card {
+          transition: transform 0.12s ease, filter 0.12s ease, box-shadow 0.12s ease, outline 0.12s ease, border-color 0.12s ease !important;
+          box-sizing: border-box !important;
+          outline: none !important;
+        }
+        .deckymus-playlist-card:focus-within,
+        .deckymus-playlist-card:focus,
+        .deckymus-playlist-card:focus-visible,
+        .deckymus-playlist-card.focused,
+        .deckymus-playlist-card[data-focused="true"] {
+          outline: 2px solid #3b82f6 !important;
+          outline-offset: 1px !important;
+          box-shadow: 0 0 14px rgba(59, 130, 246, 0.85), inset 0 0 4px rgba(255, 255, 255, 0.25) !important;
+          transform: scale(1.03) !important;
+          filter: brightness(1.2) !important;
+          border-color: #3b82f6 !important;
+          z-index: 2 !important;
+        }
+        .deckymus-ctrl-btn {
+          transition: transform 0.1s ease, filter 0.1s ease, box-shadow 0.1s ease, outline 0.1s ease !important;
+          box-sizing: border-box !important;
+        }
+        .deckymus-ctrl-btn:focus,
+        .deckymus-ctrl-btn:focus-visible,
+        .deckymus-ctrl-btn.focused,
+        .deckymus-ctrl-btn[data-focused="true"] {
+          outline: 2px solid #3b82f6 !important;
+          outline-offset: 1px !important;
+          box-shadow: 0 0 12px rgba(59, 130, 246, 0.9), inset 0 0 4px rgba(255, 255, 255, 0.4) !important;
+          transform: scale(1.08) !important;
+          filter: brightness(1.25) !important;
+          z-index: 5 !important;
+        }
+        .deckymus-focus-btn {
+          transition: transform 0.12s ease, filter 0.12s ease, box-shadow 0.12s ease, outline 0.12s ease, border-color 0.12s ease !important;
+          box-sizing: border-box !important;
+        }
+        .deckymus-focus-btn,
+        .deckymus-focus-btn *,
+        .deckymus-focus-btn:focus,
+        .deckymus-focus-btn:focus *,
+        .deckymus-focus-btn.focused,
+        .deckymus-focus-btn.focused *,
+        .deckymus-focus-btn[data-focused="true"],
+        .deckymus-focus-btn[data-focused="true"] * {
+          color: #ffffff !important;
+        }
+        .deckymus-focus-btn:focus,
+        .deckymus-focus-btn:focus-visible,
+        .deckymus-focus-btn.focused,
+        .deckymus-focus-btn[data-focused="true"] {
+          outline: 2px solid #3b82f6 !important;
+          outline-offset: 1px !important;
+          box-shadow: 0 0 14px rgba(59, 130, 246, 0.9), inset 0 0 4px rgba(255, 255, 255, 0.35) !important;
+          transform: scale(1.05) !important;
+          filter: brightness(1.25) !important;
+          border-color: #3b82f6 !important;
+          z-index: 5 !important;
+        }
+        .deckymus-search-input-box {
+          border-radius: 8px !important;
+          transition: border-color 0.12s ease, box-shadow 0.12s ease, outline 0.12s ease !important;
+          box-sizing: border-box !important;
+        }
+        .deckymus-search-input-box.focused,
+        .deckymus-search-input-box[data-focused="true"],
+        .deckymus-search-input-box:focus-within {
+          outline: 2px solid #3b82f6 !important;
+          outline-offset: 1px !important;
+          box-shadow: 0 0 14px rgba(59, 130, 246, 0.9), inset 0 0 6px rgba(59, 130, 246, 0.3) !important;
+          border-color: #3b82f6 !important;
+        }
+        .deckymus-search-input-box.focused input,
+        .deckymus-search-input-box[data-focused="true"] input,
+        .deckymus-search-input-box:focus-within input {
+          border-color: #3b82f6 !important;
+          color: #ffffff !important;
+        }
+        .deckymus-search-input {
+          transition: border-color 0.12s ease, box-shadow 0.12s ease, outline 0.12s ease !important;
+          box-sizing: border-box !important;
+        }
+        .deckymus-search-input:focus,
+        .deckymus-search-input:focus-visible,
+        .deckymus-search-input.focused,
+        .deckymus-search-input[data-focused="true"] {
+          outline: 2px solid #3b82f6 !important;
+          outline-offset: 1px !important;
+          box-shadow: 0 0 14px rgba(59, 130, 246, 0.9), inset 0 0 6px rgba(59, 130, 246, 0.3) !important;
+          border-color: #3b82f6 !important;
+        }
+        .deckymus-trash-btn {
+          width: 36px !important;
+          min-width: 36px !important;
+          max-width: 36px !important;
+          height: 36px !important;
+          padding: 0 !important;
+          flex: 0 0 auto !important;
+        }
+        .deckymus-trash-btn:focus,
+        .deckymus-trash-btn:focus-visible,
+        .deckymus-trash-btn.focused,
+        .deckymus-trash-btn[data-focused="true"] {
+          outline: 2px solid #ef4444 !important;
+          outline-offset: 1px !important;
+          box-shadow: 0 0 12px rgba(239, 68, 68, 0.95), inset 0 0 4px rgba(255, 255, 255, 0.3) !important;
+          transform: scale(1.1) !important;
+          filter: brightness(1.3) !important;
+          border-color: #ef4444 !important;
+          z-index: 5 !important;
+        }
+        .deckymus-logout-btn {
+          width: auto !important;
+          min-width: 80px !important;
+          max-width: 95px !important;
+          flex: 0 0 auto !important;
+          height: 36px !important;
+        }
+        .deckymus-logout-btn:focus,
+        .deckymus-logout-btn:focus-visible,
+        .deckymus-logout-btn.focused,
+        .deckymus-logout-btn[data-focused="true"] {
+          outline: 2px solid #ef4444 !important;
+          outline-offset: 1px !important;
+          box-shadow: 0 0 12px rgba(239, 68, 68, 0.95), inset 0 0 4px rgba(255, 255, 255, 0.3) !important;
+          transform: scale(1.05) !important;
+          filter: brightness(1.25) !important;
+          border-color: #ef4444 !important;
+          z-index: 5 !important;
+        }
+      ` }), SP_JSX.jsx(DFL.SidebarNavigation, { title: "DeckyMus", showTitle: true, pages: pages })] }));
 };
 
 const DEFAULT_STATUS = {

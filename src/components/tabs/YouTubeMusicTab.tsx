@@ -1,11 +1,12 @@
-import { FC, useState, useEffect } from "react";
+import { FC, useState, useEffect, useRef } from "react";
 import {
   PanelSection,
   PanelSectionRow,
   DialogButton,
   TextField,
+  Focusable,
 } from "@decky/ui";
-import { FaPlay, FaPause, FaSearch, FaYoutube, FaSpinner, FaDownload } from "react-icons/fa";
+import { FaPlay, FaPause, FaSearch, FaYoutube, FaSpinner, FaDownload, FaCheck } from "react-icons/fa";
 import { Track, PlayerStatus } from "../../types";
 import { useTranslation } from "../../i18n";
 import {
@@ -42,6 +43,7 @@ export const YouTubeMusicTab: FC<YouTubeMusicTabProps> = ({ status, onRefresh })
   const [loadingTrackIdx, setLoadingTrackIdx] = useState<number | null>(null);
   const [statusMsg, setStatusMsg] = useState("");
   const [statusIsError, setStatusIsError] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Download state tracking
   const [downloadedIds, setDownloadedIds] = useState<Set<string>>(new Set());
@@ -171,49 +173,57 @@ export const YouTubeMusicTab: FC<YouTubeMusicTabProps> = ({ status, onRefresh })
         }
       `}</style>
 
-      <PanelSection title={t("ytSectionTitle")}>
+      <PanelSection>
         {/* Search Bar */}
         <PanelSectionRow>
-          <div
+          <Focusable
+            flow-children="row"
             style={{
               display: "flex",
-              gap: "10px",
+              gap: "8px",
               width: "100%",
-              minWidth: 0,
-              maxWidth: "100%",
-              boxSizing: "border-box",
               marginBottom: "12px",
               alignItems: "center",
             }}
           >
-            <div style={{ flex: "1 1 0%", minWidth: 0 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
               <TextField
-                label={t("ytSearchPlaceholder")}
                 value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  cachedQuery = e.target.value;
+                onChange={(e: any) => {
+                  const val = e?.target?.value || "";
+                  setQuery(val);
+                  cachedQuery = val;
+                }}
+                placeholder={t("ytSearchPlaceholder")}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSearch();
                 }}
               />
             </div>
-            <div style={{ width: "120px", flexShrink: 0 }}>
-              <DialogButton
-                disabled={loading || !query.trim()}
-                onClick={handleSearch}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "6px",
-                  padding: "8px 0",
-                  backgroundColor: "rgba(239, 68, 68, 0.3)",
-                }}
-              >
-                <FaSearch size={12} />
-                <span>{loading ? t("searchingBtn") : t("searchBtn")}</span>
-              </DialogButton>
-            </div>
-          </div>
+            <DialogButton
+              className="deckymus-focus-btn deckymus-search-btn"
+              disabled={loading || !query.trim()}
+              onClick={handleSearch}
+              style={{
+                width: "40px",
+                minWidth: "40px",
+                height: "40px",
+                padding: "0",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: "8px",
+                backgroundColor: "rgba(239, 68, 68, 0.3)",
+                flexShrink: 0,
+              }}
+            >
+              {loading ? (
+                <FaSpinner className="spin" size={14} />
+              ) : (
+                <FaSearch size={14} />
+              )}
+            </DialogButton>
+          </Focusable>
         </PanelSectionRow>
 
         {/* Download Status Toast / Message */}
@@ -251,8 +261,8 @@ export const YouTubeMusicTab: FC<YouTubeMusicTabProps> = ({ status, onRefresh })
               display: "flex",
               flexDirection: "column",
               gap: "6px",
+              padding: "4px 6px",
               boxSizing: "border-box",
-              overflowX: "hidden",
             }}
           >
             {loading && (
@@ -292,147 +302,164 @@ export const YouTubeMusicTab: FC<YouTubeMusicTabProps> = ({ status, onRefresh })
 
             {!loading && tracks.map((t, idx) => {
               const isCurrent = status.track?.id === t.id;
-              const isPlaying = status.playback_status === "Playing";
+              const isPlaying = isCurrent && status.playback_status === "Playing";
+              const isCurrentPaused = isCurrent && status.playback_status === "Paused";
               const isLoadingThis = loadingTrackIdx === idx;
               const isDown = isDownloaded(t);
               const isDowning = downloadingIds.has(String(t.id));
 
               return (
-                <div
+                <Focusable
                   key={t.id || idx}
+                  flow-children="row"
                   style={{
                     display: "flex",
                     alignItems: "center",
                     gap: "6px",
                     width: "100%",
-                    minWidth: 0,
-                    maxWidth: "100%",
                     boxSizing: "border-box",
-                    marginBottom: "4px",
-                    overflow: "hidden",
                   }}
                 >
-                  {/* Track Play Button */}
-                  <DialogButton
-                    onClick={() => handlePlayTrack(idx)}
+                  {/* Track Play Button (Left) */}
+                  <Focusable
+                    className="deckymus-focus-btn"
+                    onActivate={() => {
+                      if (isPlaying) {
+                        rpcPlayPause().then(onRefresh);
+                      } else if (isCurrentPaused) {
+                        rpcPlayPause().then(onRefresh);
+                      } else {
+                        handlePlayTrack(idx);
+                      }
+                    }}
                     style={{
-                      flex: "1 1 0%",
+                      flex: 1,
                       minWidth: 0,
-                      maxWidth: !isDown ? "calc(100% - 44px)" : "100%",
-                      boxSizing: "border-box",
                       display: "flex",
                       alignItems: "center",
-                      justifyContent: "space-between",
                       padding: "8px 12px",
-                      backgroundColor: isCurrent ? "rgba(239, 68, 68, 0.25)" : "rgba(255, 255, 255, 0.04)",
-                      border: isCurrent ? "1px solid rgba(239, 68, 68, 0.6)" : "1px solid transparent",
-                      textAlign: "left",
-                      overflow: "hidden",
+                      backgroundColor: isPlaying
+                        ? "rgba(239, 68, 68, 0.2)"
+                        : "rgba(255, 255, 255, 0.03)",
+                      border: isPlaying ? "1px solid #ef4444" : "1px solid rgba(255, 255, 255, 0.06)",
+                      borderRadius: "8px",
+                      gap: "10px",
+                      cursor: "pointer",
                     }}
                   >
+                    {/* Play / Pause indicator icon */}
                     <div
                       style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "10px",
-                        minWidth: 0,
-                        flex: "1 1 0%",
-                        overflow: "hidden",
-                      }}
-                    >
-                      {/* Thumbnail */}
-                      <div
-                        style={{
-                          width: "42px",
-                          height: "42px",
-                          borderRadius: "6px",
-                          overflow: "hidden",
-                          backgroundColor: "rgba(0, 0, 0, 0.3)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
-                        }}
-                      >
-                        {t.art_url ? (
-                          <img src={t.art_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                        ) : (
-                          <FaYoutube size={20} color="#ef4444" />
-                        )}
-                      </div>
-
-                      {/* Metadata */}
-                      <div style={{ flex: "1 1 0%", minWidth: 0, overflow: "hidden" }}>
-                        <div
-                          style={{
-                            fontSize: "13px",
-                            fontWeight: 600,
-                            color: isCurrent ? "#f87171" : "#f8fafc",
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                          }}
-                        >
-                          {t.title}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: "11px",
-                            color: "#94a3b8",
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                          }}
-                        >
-                          {t.artist}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Duration and Play status */}
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0, marginLeft: "8px" }}>
-                      <span style={{ fontSize: "11px", color: "#64748b" }}>
-                        {formatDuration(t.duration)}
-                      </span>
-                      {isLoadingThis ? (
-                        <FaSpinner className="deckymus-spin" size={12} color="#f87171" />
-                      ) : isCurrent && isPlaying ? (
-                        <FaPause size={11} color="#f87171" />
-                      ) : (
-                        <FaPlay size={11} color={isCurrent ? "#f87171" : "#94a3b8"} />
-                      )}
-                    </div>
-                  </DialogButton>
-
-                  {/* Download Button (Only visible if track is NOT yet downloaded) */}
-                  {!isDown && (
-                    <DialogButton
-                      disabled={isDowning}
-                      onClick={() => handleDownload(t)}
-                      style={{
-                        minWidth: "38px",
-                        maxWidth: "38px",
-                        width: "38px",
-                        height: "38px",
-                        padding: 0,
+                        minWidth: "36px",
+                        width: "36px",
+                        height: "36px",
+                        borderRadius: "50%",
+                        backgroundColor: isPlaying ? "#ef4444" : "rgba(255, 255, 255, 0.1)",
+                        color: "#fff",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        backgroundColor: isDowning ? "rgba(59, 130, 246, 0.35)" : "rgba(255, 255, 255, 0.06)",
-                        border: "1px solid rgba(255, 255, 255, 0.1)",
-                        borderRadius: "6px",
                         flexShrink: 0,
-                        boxSizing: "border-box",
                       }}
                     >
-                      {isDowning ? (
-                        <FaSpinner className="deckymus-spin" size={13} color="#60a5fa" />
+                      {isLoadingThis ? (
+                        <FaSpinner className="spin" size={12} />
+                      ) : isPlaying ? (
+                        <FaPause size={12} />
                       ) : (
-                        <FaDownload size={12} color="#94a3b8" />
+                        <FaPlay size={12} style={{ marginLeft: "2px" }} />
                       )}
-                    </DialogButton>
-                  )}
-                </div>
+                    </div>
+
+                    {/* Thumbnail */}
+                    {t.art_url ? (
+                      <img
+                        src={t.art_url}
+                        alt=""
+                        style={{ width: "38px", height: "38px", borderRadius: "6px", objectFit: "cover", flexShrink: 0 }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: "38px",
+                          height: "38px",
+                          borderRadius: "6px",
+                          backgroundColor: "rgba(255, 255, 255, 0.08)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          color: "#ef4444",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <FaYoutube size={18} />
+                      </div>
+                    )}
+
+                    {/* Metadata */}
+                    <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
+                      <div
+                        style={{
+                          fontSize: "14px",
+                          fontWeight: 600,
+                          color: isPlaying ? "#f87171" : "#f8fafc",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                      >
+                        {t.title}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "12px",
+                          color: "#94a3b8",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                      >
+                        {t.artist}
+                      </div>
+                    </div>
+
+                    {/* Duration */}
+                    <div style={{ fontSize: "12px", color: "#64748b", minWidth: "40px", textAlign: "right", flexShrink: 0 }}>
+                      {formatDuration(t.duration)}
+                    </div>
+                  </Focusable>
+
+                  {/* Download Button (Right) */}
+                  <DialogButton
+                    className="deckymus-focus-btn"
+                    style={{
+                      minWidth: "36px",
+                      width: "36px",
+                      height: "44px",
+                      padding: "0",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      borderRadius: "8px",
+                      backgroundColor: isDown
+                        ? "rgba(34, 197, 94, 0.2)"
+                        : "rgba(255, 255, 255, 0.06)",
+                      border: isDown ? "1px solid rgba(34, 197, 94, 0.4)" : "1px solid rgba(255, 255, 255, 0.08)",
+                      color: isDown ? "#4ade80" : "#cbd5e1",
+                      flexShrink: 0,
+                    }}
+                    disabled={isDowning}
+                    onClick={() => handleDownload(t)}
+                  >
+                    {isDowning ? (
+                      <FaSpinner className="spin" size={12} />
+                    ) : isDown ? (
+                      <FaCheck size={12} />
+                    ) : (
+                      <FaDownload size={12} />
+                    )}
+                  </DialogButton>
+                </Focusable>
               );
             })}
           </div>

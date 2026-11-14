@@ -3,6 +3,7 @@ import {
   PanelSectionRow,
   DialogButton,
   Navigation,
+  Focusable,
 } from "@decky/ui";
 import {
   FaPlay,
@@ -73,27 +74,9 @@ export const QAMPlayerView: FC<QAMPlayerViewProps> = ({ status, onRefresh }) => 
   const position = status.position || 0;
   const pct = duration > 0 ? Math.min(100, Math.max(0, (position / duration) * 100)) : 0;
 
-  const releaseFocus = (e?: any) => {
-    if (e && e.currentTarget) {
-      try {
-        (e.currentTarget as HTMLElement).blur();
-      } catch (_) {}
-    }
-    if (
-      typeof document !== "undefined" &&
-      document.activeElement &&
-      typeof (document.activeElement as HTMLElement).blur === "function"
-    ) {
-      try {
-        (document.activeElement as HTMLElement).blur();
-      } catch (_) {}
-    }
-  };
-
   const handleAction = async (key: string, action: () => Promise<unknown>, e?: any) => {
     if (busyRef.current) return;
     busyRef.current = true;
-    releaseFocus(e);
     setPressedKey(key);
     try {
       await action();
@@ -104,7 +87,6 @@ export const QAMPlayerView: FC<QAMPlayerViewProps> = ({ status, onRefresh }) => 
         onRefresh();
         setPressedKey(null);
         busyRef.current = false;
-        releaseFocus();
       }, 150);
     }
   };
@@ -115,7 +97,6 @@ export const QAMPlayerView: FC<QAMPlayerViewProps> = ({ status, onRefresh }) => 
   };
 
   const handleOpenFullscreen = (e?: any) => {
-    releaseFocus(e);
     setPressedKey("open");
     try {
       if (typeof Navigation.CloseSideMenus === "function") {
@@ -127,7 +108,6 @@ export const QAMPlayerView: FC<QAMPlayerViewProps> = ({ status, onRefresh }) => 
     }
     setTimeout(() => {
       setPressedKey(null);
-      releaseFocus();
     }, 120);
   };
 
@@ -135,19 +115,40 @@ export const QAMPlayerView: FC<QAMPlayerViewProps> = ({ status, onRefresh }) => 
     <div style={{ width: "100%", boxSizing: "border-box" }}>
       <style>{`
         .deckymus-qam-btn {
-          transition: transform 0.08s ease, filter 0.08s ease !important;
-          outline: none !important;
+          transition: transform 0.1s ease, filter 0.1s ease, box-shadow 0.1s ease, outline 0.1s ease !important;
+          box-sizing: border-box !important;
         }
-        .deckymus-qam-btn:focus:not(:focus-visible) {
-          outline: none !important;
-          box-shadow: none !important;
+        .deckymus-qam-btn:focus,
+        .deckymus-qam-btn:focus-visible,
+        .deckymus-qam-btn.focused,
+        .deckymus-qam-btn[data-focused="true"] {
+          outline: 2px solid #3b82f6 !important;
+          outline-offset: 1px !important;
+          box-shadow: 0 0 10px rgba(59, 130, 246, 0.9), inset 0 0 4px rgba(255, 255, 255, 0.4) !important;
+          transform: scale(1.05) !important;
+          filter: brightness(1.25) !important;
+          z-index: 5 !important;
+        }
+        .deckymus-open-btn {
+          transition: transform 0.1s ease, filter 0.1s ease, box-shadow 0.1s ease, outline 0.1s ease !important;
         }
         .deckymus-open-btn,
         .deckymus-open-btn *,
-        .deckymus-open-btn:focus,
         .deckymus-open-btn:active {
           color: #ffffff !important;
           opacity: 1 !important;
+        }
+        .deckymus-open-btn:focus,
+        .deckymus-open-btn:focus-visible,
+        .deckymus-open-btn.focused,
+        .deckymus-open-btn[data-focused="true"] {
+          outline: 2px solid #ffffff !important;
+          outline-offset: 1px !important;
+          box-shadow: 0 0 12px rgba(255, 255, 255, 0.9) !important;
+          transform: scale(1.02) !important;
+          filter: brightness(1.25) !important;
+          color: #ffffff !important;
+          z-index: 5 !important;
         }
       `}</style>
 
@@ -321,7 +322,8 @@ export const QAMPlayerView: FC<QAMPlayerViewProps> = ({ status, onRefresh }) => 
 
       {/* 3. Playback Controls Grid: Previous, Play/Pause, Next */}
       <PanelSectionRow>
-        <div
+        <Focusable
+          flow-children="row"
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(3, 1fr)",
@@ -336,10 +338,7 @@ export const QAMPlayerView: FC<QAMPlayerViewProps> = ({ status, onRefresh }) => 
               className="deckymus-qam-btn"
               disabled={!hasTrack}
               onPointerDown={() => setPressedKey("prev")}
-              onPointerUp={(e) => {
-                setPressedKey(null);
-                releaseFocus(e);
-              }}
+              onPointerUp={() => setPressedKey(null)}
               onClick={(e) => handleAction("prev", rpcPreviousTrack, e)}
               style={{
                 minWidth: "0px",
@@ -363,10 +362,7 @@ export const QAMPlayerView: FC<QAMPlayerViewProps> = ({ status, onRefresh }) => 
               className="deckymus-qam-btn"
               disabled={!hasTrack}
               onPointerDown={() => setPressedKey("play")}
-              onPointerUp={(e) => {
-                setPressedKey(null);
-                releaseFocus(e);
-              }}
+              onPointerUp={() => setPressedKey(null)}
               onClick={(e) => handleAction("play", rpcPlayPause, e)}
               style={{
                 minWidth: "0px",
@@ -390,10 +386,7 @@ export const QAMPlayerView: FC<QAMPlayerViewProps> = ({ status, onRefresh }) => 
               className="deckymus-qam-btn"
               disabled={!hasTrack}
               onPointerDown={() => setPressedKey("next")}
-              onPointerUp={(e) => {
-                setPressedKey(null);
-                releaseFocus(e);
-              }}
+              onPointerUp={() => setPressedKey(null)}
               onClick={(e) => handleAction("next", rpcNextTrack, e)}
               style={{
                 minWidth: "0px",
@@ -411,12 +404,13 @@ export const QAMPlayerView: FC<QAMPlayerViewProps> = ({ status, onRefresh }) => 
               <FaForward size={13} />
             </DialogButton>
           </div>
-        </div>
+        </Focusable>
       </PanelSectionRow>
 
       {/* 4. Secondary Controls: Shuffle & Repeat */}
       <PanelSectionRow>
-        <div
+        <Focusable
+          flow-children="row"
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(2, 1fr)",
@@ -430,10 +424,7 @@ export const QAMPlayerView: FC<QAMPlayerViewProps> = ({ status, onRefresh }) => 
             <DialogButton
               className="deckymus-qam-btn"
               onPointerDown={() => setPressedKey("shuffle")}
-              onPointerUp={(e) => {
-                setPressedKey(null);
-                releaseFocus(e);
-              }}
+              onPointerUp={() => setPressedKey(null)}
               onClick={(e) => handleAction("shuffle", rpcToggleShuffle, e)}
               style={{
                 minWidth: "0px",
@@ -466,10 +457,7 @@ export const QAMPlayerView: FC<QAMPlayerViewProps> = ({ status, onRefresh }) => 
             <DialogButton
               className="deckymus-qam-btn"
               onPointerDown={() => setPressedKey("repeat")}
-              onPointerUp={(e) => {
-                setPressedKey(null);
-                releaseFocus(e);
-              }}
+              onPointerUp={() => setPressedKey(null)}
               onClick={(e) => handleRepeatCycle(e)}
               style={{
                 minWidth: "0px",
@@ -498,12 +486,13 @@ export const QAMPlayerView: FC<QAMPlayerViewProps> = ({ status, onRefresh }) => 
               </span>
             </DialogButton>
           </div>
-        </div>
+        </Focusable>
       </PanelSectionRow>
 
       {/* 4.5. Independent Volume Slider */}
       <PanelSectionRow>
-        <div
+        <Focusable
+          flow-children="row"
           style={{
             display: "flex",
             alignItems: "center",
@@ -517,7 +506,8 @@ export const QAMPlayerView: FC<QAMPlayerViewProps> = ({ status, onRefresh }) => 
             marginBottom: "8px",
           }}
         >
-          <div
+          <DialogButton
+            className="deckymus-focus-btn"
             onClick={toggleMute}
             style={{
               display: "flex",
@@ -526,9 +516,12 @@ export const QAMPlayerView: FC<QAMPlayerViewProps> = ({ status, onRefresh }) => 
               cursor: "pointer",
               color: volume === 0 ? "#ef4444" : "#60a5fa",
               flexShrink: 0,
-              width: "20px",
+              width: "28px",
+              minWidth: "28px",
+              height: "28px",
+              padding: 0,
+              backgroundColor: "transparent",
             }}
-            title={volume === 0 ? t("unmute") : t("mute")}
           >
             {volume === 0 ? (
               <FaVolumeMute size={14} />
@@ -537,7 +530,7 @@ export const QAMPlayerView: FC<QAMPlayerViewProps> = ({ status, onRefresh }) => 
             ) : (
               <FaVolumeUp size={14} />
             )}
-          </div>
+          </DialogButton>
 
           <input
             type="range"
@@ -573,7 +566,7 @@ export const QAMPlayerView: FC<QAMPlayerViewProps> = ({ status, onRefresh }) => 
           >
             {Math.round(volume)}%
           </span>
-        </div>
+        </Focusable>
       </PanelSectionRow>
 
       {/* 5. Open Fullscreen DeckyMus Button */}
@@ -581,10 +574,7 @@ export const QAMPlayerView: FC<QAMPlayerViewProps> = ({ status, onRefresh }) => 
         <DialogButton
           className="deckymus-qam-btn deckymus-open-btn"
           onPointerDown={() => setPressedKey("open")}
-          onPointerUp={(e) => {
-            setPressedKey(null);
-            releaseFocus(e);
-          }}
+          onPointerUp={() => setPressedKey(null)}
           onClick={(e) => handleOpenFullscreen(e)}
           style={{
             minWidth: "0px",

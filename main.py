@@ -16,7 +16,12 @@ import logging
 import subprocess
 import base64
 import urllib.parse
+import time
+import secrets
+import hashlib
 from pathlib import Path
+import threading
+from http.server import HTTPServer, ThreadingHTTPServer, BaseHTTPRequestHandler
 from concurrent.futures import ThreadPoolExecutor
 
 import importlib.util
@@ -104,6 +109,12 @@ except ImportError:
     logger = logging.getLogger("DeckyMus")
 
 try:
+    import qrcode
+    import qrcode.image.svg
+except Exception:
+    qrcode = None
+
+try:
     import mutagen
     from mutagen.id3 import ID3
     from mutagen.mp3 import MP3
@@ -116,8 +127,10 @@ except Exception as e:
 
 try:
     from yandex_music import Client as YandexClient
+    from yandex_music.exceptions import DeviceAuthError
 except Exception as e:
     YandexClient = None
+    DeviceAuthError = Exception
     logger.warning(f"Yandex Music import note: {e}")
 
 try:
@@ -132,6 +145,18 @@ except Exception as e:
     yt_dlp = None
     logger.warning(f"yt_dlp import note: {e}")
 
+SPOTIFY_PUBLIC_CLIENT_ID = "65b708073fc0480ea92a077233ca87bd"
+SPOTIFY_AUTH_SCOPE = "user-read-private user-read-email user-library-read playlist-read-private playlist-read-collaborative"
+SPOTIFY_PKCE_TTL = 600  # 10 minutes session cache validity before regenerating verifier
+
+KATE_USER_AGENT = "KateMobileAndroid/56 lite-443 (Android 10; SDK 29; arm64-v8a; samsung SM-G973F; Pixel 4; ru)"
+VK_CLIENT_ID = "6463690"
+VK_API_VERSION = "5.131"
+VK_USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+# Yandex Music OAuth Credentials (matching Cassette desktop app)
+YANDEX_CLIENT_ID = "23cabbbdc6cd418abb4b39c32c41195d"
+YANDEX_AUTH_URL = f"https://oauth.yandex.ru/authorize?response_type=token&client_id={YANDEX_CLIENT_ID}"
 
 def get_user_info():
     """Detects target Steam Deck unprivileged user (deck or current user) and paths."""
@@ -163,6 +188,47 @@ def get_user_info():
         "uid": pw.pw_uid,
         "gid": pw.pw_gid
     }
+
+
+class ReusableHTTPServer(ThreadingHTTPServer):
+    """
+    Multi-threaded HTTP server enabling immediate socket address reuse (SO_REUSEADDR)
+    to eliminate port collision errors upon fast reload.
+    Strictly avoids kernel port reuse hashing to prevent TCP RST / [Errno 104] connection reset races
+    in the Linux kernel when sockets are closed during tests or reloads.
+    Tracks active worker threads and gracefully drains them upon server_close().
+    """
+    allow_reuse_address = True
+    daemon_threads = False
+    block_on_close = True
+
+    def server_bind(self):
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        super().server_bind()
+
+    def server_close(self):
+        """
+        Gracefully close listening socket and drain active worker threads with bounded timeout.
+        """
+        try:
+            if self.socket:
+                self.socket.close()
+        except Exception:
+            pass
+
+        if hasattr(self, "_threads"):
+            if hasattr(self._threads, "pop_all"):
+                threads = self._threads.pop_all()
+            elif isinstance(self._threads, (list, tuple, set)):
+                threads = list(self._threads)
+            else:
+                threads = []
+            deadline = time.time() + 3.0
+            current = threading.current_thread()
+            for t in threads:
+                if t is not current and t.is_alive():
+                    remaining = max(0.01, deadline - time.time())
+                    t.join(timeout=remaining)
 
 
 class Plugin:
@@ -207,7 +273,29 @@ class Plugin:
         self._yt_search_cache = {}
         self._monitor_task = None
         self._yandex_client = None
+        self._yandex_device_code = None
+        self._yandex_user_code = None
+        self._yandex_auth_url = None
+        self._yandex_qr_svg = None
+        self._yandex_code_expires_at = 0
+        self._yandex_poll_task = None
+        self._yandex_auth_lock = None
+        self._yandex_auth_cooldown_until = 0.0
+        self._yandex_poll_interval = 5
         self._req_counter = 0
+        self._vk_user = self.config.get("vk_user") or None
+        self._vk_logged_in = bool(self._vk_user)
+        self._vk_browser_auth_task = None
+        self._spotify_user = self.config.get("spotify_user") or None
+        self._spotify_access_token = self.config.get("spotify_token") or ""
+        self._spotify_token_expires = 0
+        self._spotify_pkce_session = None
+        self._spotify_auth_state = None
+        self._spotify_lock = threading.RLock()
+        self._config_lock = threading.RLock()
+        self._auth_server_lock = threading.RLock()
+        self._auth_server = None
+        self._auth_server_thread = None
 
     def _demote(self):
         uid = self.uid
@@ -252,6 +340,13 @@ class Plugin:
             ],
             "download_folder": default_dl,
             "yandex_token": "",
+            "vk_token": "",
+            "vk_user": {},
+            "spotify_client_id": "",
+            "spotify_client_secret": "",
+            "spotify_token": "",
+            "spotify_refresh_token": "",
+            "spotify_user": {},
             "volume": 85,
             "repeat": "off",
             "shuffle": False
@@ -268,12 +363,22 @@ class Plugin:
         return default_cfg
 
     def _save_config(self):
-        try:
-            with open(self.config_file, "w", encoding="utf-8") as f:
-                json.dump(self.config, f, indent=2, ensure_ascii=False)
-            os.chown(self.config_file, self.uid, self.gid)
-        except Exception as e:
-            logger.warning(f"Failed to save config: {e}")
+        lock = getattr(self, "_config_lock", None)
+        if lock:
+            with lock:
+                try:
+                    with open(self.config_file, "w", encoding="utf-8") as f:
+                        json.dump(self.config, f, indent=2, ensure_ascii=False)
+                    os.chown(self.config_file, self.uid, self.gid)
+                except Exception as e:
+                    logger.warning(f"Failed to save config: {e}")
+        else:
+            try:
+                with open(self.config_file, "w", encoding="utf-8") as f:
+                    json.dump(self.config, f, indent=2, ensure_ascii=False)
+                os.chown(self.config_file, self.uid, self.gid)
+            except Exception as e:
+                logger.warning(f"Failed to save config: {e}")
 
     # ==================== MPV Engine ====================
 
@@ -412,11 +517,30 @@ class Plugin:
         if self.config.get("yandex_token"):
             asyncio.create_task(self._init_yandex_client(self.config["yandex_token"]))
 
+        # Initialize VK Music client if token exists
+        if self.config.get("vk_token"):
+            asyncio.create_task(self._init_vk_client(self.config["vk_token"]))
+
+        # Initialize Spotify client if token or credentials exist
+        if self.config.get("spotify_token") or self.config.get("spotify_refresh_token") or (self.config.get("spotify_client_id") and self.config.get("spotify_client_secret")):
+            asyncio.create_task(self._init_spotify_client())
+
+        # Start local background auth helper server
+        self._start_auth_server()
+
         # Start background monitor for track finish / queue progression
         self._monitor_task = asyncio.create_task(self._playback_monitor_loop())
 
+        # Start background monitor for VK OAuth browser redirect in Steam CEF
+        self._vk_browser_auth_task = asyncio.create_task(self._vk_browser_monitor_loop())
+
     async def _unload(self):
         logger.info("DeckyMus plugin unloading")
+        self._stop_auth_server()
+        if hasattr(self, "_vk_browser_auth_task") and self._vk_browser_auth_task and not self._vk_browser_auth_task.done():
+            self._vk_browser_auth_task.cancel()
+        if self._yandex_poll_task and not self._yandex_poll_task.done():
+            self._yandex_poll_task.cancel()
         if self._monitor_task:
             self._monitor_task.cancel()
         if self.mpv_process:
@@ -717,7 +841,7 @@ class Plugin:
             play_url = track.get("path") or track.get("url")
 
             # If track is from an online service, check if local copy is already downloaded
-            if source in ("ytmusic", "yandex", "vk") or not play_url:
+            if source in ("ytmusic", "yandex", "vk", "spotify") or not play_url:
                 local_file = self._find_local_download(track)
                 if local_file:
                     play_url = local_file
@@ -731,6 +855,10 @@ class Plugin:
                     play_url = f"https://www.youtube.com/watch?v={track.get('id')}"
             elif source == "yandex" and not play_url:
                 play_url = await self._resolve_yandex_url(track.get("id"))
+            elif source == "vk":
+                play_url = await self._resolve_vk_url(track)
+            elif source == "spotify":
+                play_url = await self._resolve_spotify_url(track)
 
             if not play_url:
                 logger.error(f"Could not resolve play URL for track {track.get('title')}")
@@ -930,61 +1058,94 @@ class Plugin:
                     logger.error(f"Yandex download error: {de}")
                     return {"success": False, "error": f"Ошибка скачивания: {de}"}
 
+            elif source == "vk":
+                stream_url = self._sync_resolve_vk_url(track)
+                if not stream_url:
+                    return {"success": False, "error": "Не удалось получить аудиопоток VK"}
+
+                if "index.m3u8" in stream_url or ".m3u8" in stream_url:
+                    ffmpeg_bin = _get_bin("ffmpeg")
+                    cmd = [
+                        ffmpeg_bin, "-y",
+                        "-headers", f"User-Agent: {KATE_USER_AGENT}\r\n",
+                        "-i", stream_url,
+                        "-c:a", "libmp3lame",
+                        "-q:a", "2",
+                        str(tmp_path)
+                    ]
+                    ret = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    if ret.returncode != 0 or not tmp_path.is_file():
+                        cmd2 = [ffmpeg_bin, "-y", "-i", stream_url, "-c:a", "libmp3lame", "-q:a", "2", str(tmp_path)]
+                        ret2 = subprocess.run(cmd2, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                        if ret2.returncode != 0 or not tmp_path.is_file():
+                            return {"success": False, "error": "Ошибка конвертации потока VK"}
+                else:
+                    if not requests:
+                        return {"success": False, "error": "requests недоступен"}
+                    headers = {"User-Agent": VK_USER_AGENT}
+                    resp = requests.get(stream_url, headers=headers, stream=True, timeout=35)
+                    resp.raise_for_status()
+                    with open(tmp_path, "wb") as f:
+                        for chunk in resp.iter_content(chunk_size=65536):
+                            if chunk:
+                                f.write(chunk)
+
+            elif source == "spotify":
+                if not yt_dlp:
+                    return {"success": False, "error": "yt-dlp недоступен"}
+
+                search_q = f"ytsearch1:{clean_a} - {clean_t} audio" if clean_a else f"ytsearch1:{clean_t} audio"
+                tmp_out = str(dl_dir / f".{final_filename}.tmp.%(ext)s")
+                ydl_opts = {
+                    "ffmpeg_location": _get_bin("ffmpeg"),
+                    "format": "bestaudio/best",
+                    "quiet": True,
+                    "no_warnings": True,
+                    "extract_flat": False,
+                    "outtmpl": tmp_out,
+                    "postprocessors": [{
+                        "key": "FFmpegExtractAudio",
+                        "preferredcodec": "mp3",
+                        "preferredquality": "320",
+                    }],
+                }
+                try:
+                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                        ydl.download([search_q])
+                except Exception as se:
+                    logger.error(f"Spotify yt-dlp download error: {se}")
+                    return {"success": False, "error": f"Ошибка скачивания Spotify: {se}"}
+
             elif source == "ytmusic":
                 if not yt_dlp:
                     logger.error("Download failed: yt-dlp is not available")
                     return {"success": False, "error": "yt-dlp недоступен"}
 
-                ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36"
-                last_err = ""
+                target_url = f"https://www.youtube.com/watch?v={track_id}"
+                if not re.match(r"^[a-zA-Z0-9_-]{11}$", track_id):
+                    search_q = f"{clean_a} - {clean_t} audio" if clean_a else f"{clean_t} audio"
+                    target_url = f"ytsearch1:{search_q}"
 
-                # Retry up to 2 times in case of transient YouTube 403 / throttling
-                for attempt in range(1, 3):
-                    try:
-                        ydl_opts = {
-                            "format": "bestaudio/best",
-                            "quiet": True,
-                            "no_warnings": True,
-                            "extract_flat": False
-                        }
-                        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                            info = ydl.extract_info(f"https://www.youtube.com/watch?v={track_id}", download=False)
-                            direct_url = info.get("url")
-                    except Exception as ye:
-                        last_err = f"Ошибка извлечения потока: {ye}"
-                        logger.error(f"yt_dlp extraction error for {track_id} (attempt {attempt}): {ye}")
-                        continue
-
-                    if not direct_url:
-                        last_err = "Не удалось извлечь YouTube поток"
-                        continue
-
-                    cmd = [
-                        _get_bin("ffmpeg"), "-y",
-                        "-user_agent", ua,
-                        "-reconnect", "1",
-                        "-reconnect_streamed", "1",
-                        "-reconnect_delay_max", "5",
-                        "-i", direct_url,
-                        "-vn", "-c:a", "libmp3lame", "-b:a", "192k",
-                        "-f", "mp3",
-                        "-metadata", f"title={title}",
-                        "-metadata", f"artist={artist}",
-                        "-metadata", f"album={album}",
-                        str(tmp_path)
-                    ]
-                    proc = subprocess.run(cmd, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
-                    if proc.returncode == 0:
-                        last_err = ""
-                        break
-                    else:
-                        last_err = (proc.stderr or "")[-400:].strip()
-                        logger.warning(f"FFmpeg attempt {attempt} error {proc.returncode}: {last_err}")
-                        import time
-                        time.sleep(1.0)
-
-                if last_err or not tmp_path.is_file():
-                    return {"success": False, "error": f"Ошибка скачивания ({last_err[:80]})"}
+                tmp_out = str(dl_dir / f".{final_filename}.tmp.%(ext)s")
+                ydl_opts = {
+                    "ffmpeg_location": _get_bin("ffmpeg"),
+                    "format": "bestaudio/best",
+                    "quiet": True,
+                    "no_warnings": True,
+                    "extract_flat": False,
+                    "outtmpl": tmp_out,
+                    "postprocessors": [{
+                        "key": "FFmpegExtractAudio",
+                        "preferredcodec": "mp3",
+                        "preferredquality": "320",
+                    }],
+                }
+                try:
+                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                        ydl.download([target_url])
+                except Exception as ye:
+                    logger.error(f"YTMusic yt-dlp download error: {ye}")
+                    return {"success": False, "error": f"Ошибка скачивания: {ye}"}
             else:
                 return {"success": False, "error": f"Неизвестный источник {source}"}
 
@@ -1178,43 +1339,211 @@ class Plugin:
 
     async def _init_yandex_client(self, token: str):
         if not YandexClient or not token:
+            self._yandex_client = None
             return None
         try:
             def _create():
                 c = YandexClient(token).init()
                 return c
             self._yandex_client = await asyncio.to_thread(_create)
+            logger.info("Yandex Music client initialized successfully")
+
+            # Cache user info
+            try:
+                account = getattr(self._yandex_client.me, "account", None)
+                if account:
+                    user_name = ""
+                    for attr in ("display_name", "full_name", "login"):
+                        val = getattr(account, attr, None)
+                        if isinstance(val, str) and val.strip():
+                            user_name = val.strip()
+                            break
+                    uid = getattr(account, "uid", None)
+                    user_id = str(uid) if (isinstance(uid, (str, int)) and str(uid).strip()) else ""
+                    avatar = f"https://avatars.yandex.net/get-yapic/{user_id}/islands-200" if user_id else ""
+                    self.config["yandex_user"] = {
+                        "name": user_name,
+                        "id": user_id,
+                        "avatar": avatar,
+                    }
+                    self._save_config()
+            except Exception as e:
+                logger.debug(f"Could not extract Yandex user metadata: {e}")
+
             return self._yandex_client
         except Exception as e:
             logger.warning(f"Yandex Music init error: {e}")
             self._yandex_client = None
             return None
 
+    def _get_yandex_auth_lock(self):
+        if self._yandex_auth_lock is None:
+            self._yandex_auth_lock = asyncio.Lock()
+        return self._yandex_auth_lock
+
+    def _get_yandex_auth_url(self, user_code: str = "") -> str:
+        if user_code:
+            code = (user_code or "").strip()
+            return f"https://ya.ru/device?user_code={urllib.parse.quote(code)}"
+        return YANDEX_AUTH_URL
+
+    async def _poll_yandex_token(self, device_code: str):
+        def _poll():
+            if not YandexClient:
+                return None
+            try:
+                c = YandexClient()
+                return c.poll_device_token(device_code)
+            except Exception as e:
+                logger.debug(f"Yandex poll_device_token note: {e}")
+                return None
+        try:
+            res = await asyncio.to_thread(_poll)
+            if res:
+                return getattr(res, "access_token", None) or str(res)
+            return None
+        except Exception:
+            return None
+
+    def _sync_yandex_set_token(self, token: str):
+        token = (token or "").strip()
+        m = re.search(r"access_token[=:]+([^&\s#\"']+)", token)
+        if m:
+            token = m.group(1)
+        if not token:
+            return {"success": False, "error": "Empty token"}
+        self.config["yandex_token"] = token
+        self._save_config()
+        if self._loop and self._loop.is_running():
+            asyncio.run_coroutine_threadsafe(self._init_yandex_client(token), self._loop)
+        return {"success": True}
+
+    async def yandex_start_auth(self, force: bool = False):
+        """
+        Initiates or returns an active Yandex Music authorization session.
+        Uses Cassette desktop client OAuth direct authorization with QR helper fallback.
+        """
+        if self._yandex_client is not None:
+            user_info = self.config.get("yandex_user") or {}
+            return {
+                "success": True,
+                "already_logged_in": True,
+                "user_name": user_info.get("name", ""),
+                "user_id": user_info.get("id", ""),
+                "avatar": user_info.get("avatar", ""),
+            }
+
+        local_ip = self._get_local_ip()
+        helper_url = f"http://{local_ip}:9911/yandex"
+        qr_svg = self._generate_qr_svg(helper_url)
+
+        self._yandex_auth_url = YANDEX_AUTH_URL
+        self._yandex_qr_svg = qr_svg
+
+        return {
+            "success": True,
+            "auth_url": YANDEX_AUTH_URL,
+            "qr_svg": qr_svg,
+            "helper_url": helper_url,
+            "user_code": self._yandex_user_code or "",
+            "expires_in": 300,
+        }
+
+    async def _yandex_device_poll_loop(self, device_code: str, interval: int, expires_at: float):
+        return
+
     async def yandex_set_token(self, token: str):
-        self.config["yandex_token"] = token.strip()
+        token = (token or "").strip()
+        m = re.search(r"access_token[=:]+([^&\s#\"']+)", token)
+        if m:
+            token = m.group(1)
+        self.config["yandex_token"] = token
         self._save_config()
         client = await self._init_yandex_client(self.config["yandex_token"])
         if client and hasattr(client, "me"):
+            user_info = self.config.get("yandex_user") or {}
             return {
                 "success": True,
-                "user": getattr(client.me.account, "full_name", "") or getattr(client.me.account, "login", "")
+                "user": user_info.get("name", "") or getattr(client.me.account, "full_name", "") or getattr(client.me.account, "login", "")
             }
         return {"success": False, "error": "Не удалось авторизоваться по токену"}
 
     async def yandex_get_status(self):
         has_token = bool(self.config.get("yandex_token"))
         logged_in = self._yandex_client is not None
-        user_name = ""
+        user_info = self.config.get("yandex_user") or {}
+        user_name = user_info.get("name", "")
+        user_id = user_info.get("id", "")
+        avatar = user_info.get("avatar", "")
+
+        local_ip = self._get_local_ip()
+        helper_url = f"http://{local_ip}:9911/yandex"
+        qr_svg = self._generate_qr_svg(helper_url)
+
         if logged_in:
-            try:
-                user_name = getattr(self._yandex_client.me.account, "full_name", "") or getattr(self._yandex_client.me.account, "login", "")
-            except Exception:
-                pass
+            if not user_name and self._yandex_client:
+                try:
+                    account = getattr(self._yandex_client.me, "account", None)
+                    if account:
+                        for attr in ("display_name", "full_name", "login"):
+                            val = getattr(account, attr, None)
+                            if isinstance(val, str) and val.strip():
+                                user_name = val.strip()
+                                break
+                        uid = getattr(account, "uid", None)
+                        if isinstance(uid, (str, int)) and str(uid).strip():
+                            user_id = str(uid).strip()
+                            avatar = f"https://avatars.yandex.net/get-yapic/{user_id}/islands-200"
+                except Exception:
+                    pass
+
+            return {
+                "has_token": has_token,
+                "logged_in": True,
+                "user_name": user_name,
+                "user_id": user_id,
+                "avatar": avatar,
+                "auth_url": YANDEX_AUTH_URL,
+                "helper_url": helper_url,
+                "qr_svg": qr_svg,
+            }
+
         return {
             "has_token": has_token,
-            "logged_in": logged_in,
-            "user_name": user_name
+            "logged_in": False,
+            "user_name": "",
+            "user_id": "",
+            "avatar": "",
+            "auth_url": YANDEX_AUTH_URL,
+            "helper_url": helper_url,
+            "qr_svg": qr_svg,
+            "user_code": self._yandex_user_code or "",
+            "expires_in": 300,
         }
+
+    async def yandex_logout(self):
+        logger.info("Yandex Music logging out")
+        if self._yandex_poll_task and not self._yandex_poll_task.done():
+            self._yandex_poll_task.cancel()
+            self._yandex_poll_task = None
+
+        self._yandex_device_code = None
+        self._yandex_user_code = None
+        self._yandex_auth_url = None
+        self._yandex_qr_svg = None
+        self._yandex_code_expires_at = 0
+        self._yandex_auth_cooldown_until = 0.0
+        self._yandex_client = None
+
+        self.config["yandex_token"] = ""
+        self.config["yandex_user"] = {}
+        self._save_config()
+        return {"success": True}
+
+        self.config["yandex_token"] = ""
+        self.config["yandex_user"] = {}
+        self._save_config()
+        return {"success": True}
 
     async def yandex_get_playlists(self):
         if not self._yandex_client:
@@ -1256,12 +1585,34 @@ class Plugin:
         def _get():
             try:
                 tracks = []
+                raw_tracks = []
                 if playlist_id == "likes":
                     likes = self._yandex_client.users_likes_tracks()
-                    raw_tracks = [l.fetch_track() for l in likes[:150] if l]
+                    if likes:
+                        likes_slice = likes[:2000]
+                        track_ids = [str(getattr(l, "id", "") or getattr(l, "track_id", "") or "") for l in likes_slice]
+                        track_ids = [tid for tid in track_ids if tid]
+                        chunk_size = 100
+                        for i in range(0, len(track_ids), chunk_size):
+                            chunk = track_ids[i:i + chunk_size]
+                            try:
+                                fetched = self._yandex_client.tracks(chunk)
+                                if fetched:
+                                    raw_tracks.extend(fetched)
+                            except Exception as e:
+                                logger.error(f"Error batch fetching Yandex tracks chunk: {e}")
                 else:
-                    pl = self._yandex_client.users_playlists(kind=int(playlist_id), user_id=owner_id or self._yandex_client.me.account.uid)
-                    raw_tracks = [t.track for t in pl.tracks if t and t.track]
+                    uid = owner_id or getattr(getattr(self._yandex_client, "me", None), "account", None)
+                    uid_val = getattr(uid, "uid", None) if uid else None
+                    pl = self._yandex_client.users_playlists(kind=int(playlist_id), user_id=uid_val)
+                    if hasattr(pl, "fetch_tracks"):
+                        try:
+                            pl = pl.fetch_tracks()
+                        except Exception:
+                            pass
+                    pl_tracks = getattr(pl, "tracks", []) or []
+                    pl_slice = pl_tracks[:2000]
+                    raw_tracks = [t.track if hasattr(t, "track") and t.track else t for t in pl_slice if t]
 
                 for t in raw_tracks:
                     if not t:
@@ -1269,13 +1620,13 @@ class Plugin:
                     cover = ""
                     if hasattr(t, "cover_uri") and t.cover_uri:
                         cover = "https://" + t.cover_uri.replace("%%", "200x200")
-                    artists_str = ", ".join(a.name for a in t.artists) if t.artists else "Исполнитель"
-                    duration_s = int(t.duration_ms / 1000) if t.duration_ms else 0
+                    artists_str = ", ".join(a.name for a in t.artists) if hasattr(t, "artists") and t.artists else "Исполнитель"
+                    duration_s = int(t.duration_ms / 1000) if hasattr(t, "duration_ms") and t.duration_ms else 0
                     tracks.append({
-                        "id": str(t.id),
-                        "title": t.title or "Трек",
+                        "id": str(getattr(t, "id", "")),
+                        "title": getattr(t, "title", "Трек"),
                         "artist": artists_str,
-                        "album": t.albums[0].title if t.albums else "",
+                        "album": t.albums[0].title if hasattr(t, "albums") and t.albums and hasattr(t.albums[0], "title") else "",
                         "duration": duration_s,
                         "art_url": cover,
                         "source": "yandex"
@@ -1407,4 +1758,1619 @@ class Plugin:
             except Exception as e:
                 logger.error(f"Failed to extract YouTube audio URL for {video_id}: {e}")
             return ""
+        return await asyncio.to_thread(_resolve)
+
+
+    # ==================== Utilities: Local IP, QR & Browser ====================
+
+    def _get_local_ip(self) -> str:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            s.connect(("8.8.8.8", 80))
+            return s.getsockname()[0]
+        except Exception:
+            return "127.0.0.1"
+        finally:
+            s.close()
+
+    def _generate_qr_svg(self, data: str) -> str:
+        if not qrcode:
+            return ""
+        try:
+            qr = qrcode.QRCode(
+                version=None,
+                error_correction=qrcode.constants.ERROR_CORRECT_M,
+                box_size=10,
+                border=1,
+                image_factory=qrcode.image.svg.SvgPathImage
+            )
+            qr.add_data(data)
+            qr.make(fit=True)
+            img = qr.make_image()
+            svg_str = img.to_string(encoding="unicode")
+            svg_str = re.sub(r'width="[^"]*"', 'width="100%"', svg_str, count=1)
+            svg_str = re.sub(r'height="[^"]*"', 'height="100%"', svg_str, count=1)
+            return svg_str
+        except Exception as e:
+            logger.warning(f"QR generation error: {e}")
+            return ""
+
+    async def open_browser(self, url: str):
+        try:
+            req = urllib.request.Request("http://127.0.0.1:8080/json")
+            with urllib.request.urlopen(req, timeout=0.8) as resp:
+                targets = json.loads(resp.read().decode("utf-8"))
+                for t in targets:
+                    ws_url = t.get("webSocketDebuggerUrl")
+                    title = t.get("title", "")
+                    if not ws_url:
+                        continue
+                    if "SharedJSContext" in title:
+                        expr = (
+                            f"try {{"
+                            f" const s = window.SteamUIStore;"
+                            f" const w = s?.WindowStore?.m_mapDesiredWindowInstances?.get?.(1) || s?.GetFocusedWindowInstance?.();"
+                            f" if (w?.m_Navigator?.ExternalWeb) {{"
+                            f"   w.m_Navigator.ExternalWeb({json.dumps(url)});"
+                            f" }} else if (window.DFL?.Navigation?.NavigateToExternalWeb) {{"
+                            f"   window.DFL.Navigation.NavigateToExternalWeb({json.dumps(url)});"
+                            f" }}"
+                            f"}} catch(e) {{}}"
+                        )
+                        self._evaluate_cef_js(ws_url, expr)
+                    elif "Big Picture" in title:
+                        expr = (
+                            f"try {{"
+                            f" const el = document.querySelector('._3-G5o_dy0uF5Q1xHJSCajl, [class*=\"BrowserContainer\"]');"
+                            f" if (el) {{"
+                            f"   const k = Object.keys(el).find(x => x.startsWith('__reactFiber'));"
+                            f"   let f = el[k];"
+                            f"   while (f) {{"
+                            f"     if (f.memoizedProps?.browser) {{"
+                            f"       f.memoizedProps.browser.LoadURL({json.dumps(url)});"
+                            f"       break;"
+                            f"     }}"
+                            f"     f = f.return;"
+                            f"   }}"
+                            f" }}"
+                            f"}} catch(e) {{}}"
+                        )
+                        self._evaluate_cef_js(ws_url, expr)
+                return {"success": True}
+        except Exception as e:
+            logger.warning(f"Failed to open browser via CEF: {e}")
+        return {"success": False}
+
+    # ==================== Local Auth HTTP Server ====================
+
+    def _start_auth_server(self):
+        with self._auth_server_lock:
+            if self._auth_server is not None:
+                return
+            self._start_auth_server_unlocked()
+
+    def _start_auth_server_unlocked(self):
+        if self._auth_server is not None:
+            return
+
+        plugin_self = self
+
+        class AuthHandler(BaseHTTPRequestHandler):
+            timeout = 5.0
+
+            def log_message(self, format, *args):
+                return
+
+            def do_OPTIONS(self):
+                self.send_response(200)
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+                self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+                self.end_headers()
+
+            def _serve_success_page(self, service_name: str, user_name: str = ""):
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                user_html = f'<div class="user">{user_name}</div>' if user_name else ""
+                html = f"""<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DeckyMus — {service_name} подключен</title>
+<style>
+* {{ box-sizing: border-box; }}
+body {{
+  margin: 0; padding: 20px; background: #0f172a; color: #f8fafc;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  display: flex; align-items: center; justify-content: center; min-height: 95vh;
+}}
+.card {{
+  background: #1e293b; border: 1px solid rgba(30, 215, 96, 0.4);
+  border-radius: 20px; padding: 32px 24px; max-width: 440px; width: 100%;
+  text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+}}
+.icon {{
+  width: 64px; height: 64px; background: rgba(30, 215, 96, 0.15);
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 16px; color: #1ed760; font-size: 32px;
+}}
+h2 {{ margin: 0 0 8px; font-size: 22px; color: #ffffff; }}
+.user {{ font-size: 16px; color: #1ed760; font-weight: 600; margin-bottom: 16px; }}
+p {{ margin: 0 0 24px; font-size: 14px; color: #94a3b8; line-height: 1.5; }}
+.btn {{
+  display: inline-block; width: 100%; padding: 14px;
+  background: #1ed760; color: #0f172a; font-size: 15px; font-weight: 700;
+  border-radius: 12px; text-decoration: none; border: none; cursor: pointer;
+}}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="icon">✓</div>
+  <h2>{service_name} успешно подключен!</h2>
+  {user_html}
+  <p>Авторизация успешно завершена.<br>Вы можете закрыть эту вкладку и вернуться к Steam Deck.</p>
+  <button class="btn" onclick="window.close()">Закрыть вкладку</button>
+</div>
+<script>
+setTimeout(function() {{
+  try {{ window.close(); }} catch(e) {{}}
+}}, 3000);
+</script>
+</body>
+</html>"""
+                self.wfile.write(html.encode("utf-8"))
+
+            def _serve_error_page(self, service_name: str, message: str, status_code: int = 400):
+                self.send_response(status_code)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                html = f"""<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DeckyMus — Ошибка авторизации</title>
+<style>
+* {{ box-sizing: border-box; }}
+body {{
+  margin: 0; padding: 20px; background: #0f172a; color: #f8fafc;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  display: flex; align-items: center; justify-content: center; min-height: 95vh;
+}}
+.card {{
+  background: #1e293b; border: 1px solid rgba(239, 68, 68, 0.4);
+  border-radius: 20px; padding: 32px 24px; max-width: 440px; width: 100%;
+  text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+}}
+.icon {{
+  width: 64px; height: 64px; background: rgba(239, 68, 68, 0.15);
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 16px; color: #ef4444; font-size: 32px;
+}}
+h2 {{ margin: 0 0 8px; font-size: 22px; color: #ffffff; }}
+p {{ margin: 0 0 24px; font-size: 14px; color: #f87171; line-height: 1.5; }}
+.btn {{
+  display: inline-block; width: 100%; padding: 14px;
+  background: #334155; color: #ffffff; font-size: 15px; font-weight: 600;
+  border-radius: 12px; text-decoration: none; border: none; cursor: pointer;
+}}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="icon">✕</div>
+  <h2>Ошибка авторизации {service_name}</h2>
+  <p>{message}</p>
+  <button class="btn" onclick="window.close()">Закрыть окно</button>
+</div>
+</body>
+</html>"""
+                self.wfile.write(html.encode("utf-8"))
+
+            def do_GET(self):
+                parsed = urllib.parse.urlparse(self.path)
+                path = parsed.path
+                query = urllib.parse.parse_qs(parsed.query)
+
+                if path in ("/", "/status"):
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.end_headers()
+                    resp = {
+                        "status": "ok",
+                        "deckymus": True,
+                        "yandex_logged_in": plugin_self._yandex_client is not None,
+                        "vk_logged_in": plugin_self._vk_user is not None,
+                        "spotify_logged_in": plugin_self._spotify_user is not None
+                    }
+                    self.wfile.write(json.dumps(resp).encode("utf-8"))
+                    return
+
+                elif path == "/yandex/auth":
+                    self.send_response(302)
+                    self.send_header("Location", YANDEX_AUTH_URL)
+                    self.end_headers()
+                    return
+
+                elif path in ("/yandex/helper", "/yandex"):
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/html; charset=utf-8")
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.end_headers()
+                    html = f"""<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>DeckyMus — Яндекс Музыка</title>
+<style>
+* {{ box-sizing: border-box; margin: 0; padding: 0; }}
+body {{ background: #0f172a; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; }}
+.card {{ background: #1e293b; border: 1px solid rgba(250, 204, 21, 0.3); border-radius: 20px; padding: 28px 24px; max-width: 440px; width: 100%; box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5); text-align: center; }}
+.icon {{ width: 56px; height: 56px; margin: 0 auto 16px; background: #facc15; border-radius: 14px; display: flex; align-items: center; justify-content: center; color: #000; font-size: 26px; font-weight: 700; }}
+h2 {{ font-size: 20px; font-weight: 700; margin-bottom: 6px; }}
+p.sub {{ font-size: 13px; color: #94a3b8; margin-bottom: 20px; }}
+.btn {{ display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 14px; font-size: 15px; font-weight: 700; border-radius: 12px; text-decoration: none; border: none; cursor: pointer; margin: 10px 0; transition: opacity 0.2s, transform 0.1s; }}
+.btn:active {{ transform: scale(0.98); }}
+.btn-yandex {{ background: #facc15; color: #000000; }}
+.btn-paste {{ background: #22c55e; color: #ffffff; }}
+.instructions {{ font-size: 12px; color: #cbd5e1; text-align: left; line-height: 1.5; background: rgba(0, 0, 0, 0.25); padding: 12px 14px; border-radius: 10px; margin: 14px 0; border: 1px solid rgba(255, 255, 255, 0.08); }}
+.instructions ol {{ padding-left: 18px; }}
+.instructions li {{ margin-bottom: 6px; }}
+input {{ width: 100%; padding: 12px 14px; background: #0f172a; border: 1px solid #334155; border-radius: 10px; color: #fff; font-size: 13px; outline: none; margin: 8px 0; }}
+input:focus {{ border-color: #facc15; }}
+.status {{ margin-top: 12px; font-size: 14px; font-weight: 600; display: none; }}
+</style></head>
+<body>
+<div class="card">
+  <div class="icon">Я</div>
+  <h2>Яндекс Музыка</h2>
+  <p class="sub">Авторизация для DeckyMus на Steam Deck</p>
+  <a class="btn btn-yandex" href="{YANDEX_AUTH_URL}" target="_blank">1. Открыть вход в Яндекс ID</a>
+  <div class="instructions">
+    <ol>
+      <li>Нажмите кнопку выше и подтвердите доступ к Яндекс ID.</li>
+      <li>После входа откроется страница подтверждения — скопируйте токен из адресной строки (после <code>access_token=</code>) или всю ссылку целиком.</li>
+      <li>Вставьте токен или ссылку в поле ниже и нажмите «Подключить к Steam Deck».</li>
+    </ol>
+  </div>
+  <input type="text" id="token" placeholder="access_token или ссылка из адресной строки" />
+  <button class="btn btn-paste" onclick="submitToken()">2. Подключить к Steam Deck</button>
+  <div id="status" class="status"></div>
+</div>
+<script>
+function submitToken() {{
+  var val = document.getElementById('token').value.trim();
+  var m = val.match(/access_token[=:]+([^&\\s#"']+)/);
+  if (m) val = m[1];
+  if (!val) {{ alert('Пожалуйста, введите токен или ссылку'); return; }}
+  fetch('/yandex/token', {{
+    method: 'POST',
+    headers: {{ 'Content-Type': 'application/json' }},
+    body: JSON.stringify({{ token: val }})
+  }}).then(r => r.json()).then(data => {{
+    var el = document.getElementById('status');
+    el.style.display = 'block';
+    if (data.success) {{
+      el.style.color = '#22c55e';
+      el.innerText = '✓ Вход выполнен! Медиатека уже подключена на консоли.';
+    }} else {{
+      el.style.color = '#ef4444';
+      el.innerText = 'Ошибка: ' + (data.error || 'Не удалось авторизоваться');
+    }}
+  }}).catch(e => {{
+    var el = document.getElementById('status');
+    el.style.display = 'block';
+    el.style.color = '#ef4444';
+    el.innerText = 'Ошибка связи: ' + e;
+  }});
+}}
+</script>
+</body></html>"""
+                    self.wfile.write(html.encode("utf-8"))
+                    return
+
+                elif path == "/vk/auth":
+                    auth_url = (
+                        f"https://oauth.vk.ru/authorize?client_id={VK_CLIENT_ID}"
+                        "&scope=audio&redirect_uri=https://oauth.vk.ru/blank.html"
+                        "&display=page&response_type=token"
+                    )
+                    self.send_response(302)
+                    self.send_header("Location", auth_url)
+                    self.end_headers()
+                    return
+
+                elif path in ("/vk/helper", "/vk"):
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/html; charset=utf-8")
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.end_headers()
+                    html = """<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>DeckyMus — VK Музыка</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #0f172a; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; }
+.card { background: #1e293b; border: 1px solid rgba(0, 119, 255, 0.3); border-radius: 20px; padding: 28px 24px; max-width: 440px; width: 100%; box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5); text-align: center; }
+.icon { width: 56px; height: 56px; margin: 0 auto 16px; background: #0077ff; border-radius: 14px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 26px; font-weight: 700; }
+h2 { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+p.sub { font-size: 13px; color: #94a3b8; margin-bottom: 20px; }
+.btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 14px; font-size: 15px; font-weight: 600; border-radius: 12px; text-decoration: none; border: none; cursor: pointer; margin: 10px 0; transition: opacity 0.2s, transform 0.1s; }
+.btn:active { transform: scale(0.98); }
+.btn-vk { background: #0077ff; color: #ffffff; }
+.btn-paste { background: #22c55e; color: #ffffff; }
+.instructions { font-size: 12px; color: #cbd5e1; text-align: left; line-height: 1.5; background: rgba(0, 0, 0, 0.25); padding: 12px 14px; border-radius: 10px; margin: 14px 0; border: 1px solid rgba(255, 255, 255, 0.08); }
+.instructions ol { padding-left: 18px; }
+.instructions li { margin-bottom: 6px; }
+input { width: 100%; padding: 12px 14px; background: #0f172a; border: 1px solid #334155; border-radius: 10px; color: #fff; font-size: 13px; outline: none; margin: 8px 0; }
+input:focus { border-color: #0077ff; }
+.status { margin-top: 14px; padding: 12px; border-radius: 10px; font-size: 14px; line-height: 1.4; display: none; }
+.status.loading { display: block; background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.4); }
+.status.ok { display: block; background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.4); }
+.status.err { display: block; background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); }
+</style></head>
+<body>
+<div class="card" id="mainCard">
+  <div class="icon">VK</div>
+  <h2>DeckyMus — VK Музыка</h2>
+  <p class="sub">Вход на Steam Deck через смартфон</p>
+  <a class="btn btn-vk" id="vkAuthLink" href="/vk/auth" target="_blank" rel="noopener noreferrer">1. Войти через ВКонтакте</a>
+  <div class="instructions">
+    <div style="font-weight: 700; color: #facc15; margin-bottom: 6px;">⚠️ Важно:</div>
+    <ol>
+      <li>Нажмите синюю кнопку выше и подтвердите доступ к аудио.</li>
+      <li>ВКонтакте откроет <b>пустую страницу blank.html</b> (это нормально для VK).</li>
+      <li><b>Скопируйте адрес (URL)</b> этой страницы из адресной строки браузера.</li>
+      <li>Вернитесь сюда и нажмите зелёную кнопку ниже (или вставьте адрес в поле).</li>
+    </ol>
+  </div>
+  <button class="btn btn-paste" id="pasteBtn" onclick="handlePasteButton()">📋 2. Вставить ссылку и войти</button>
+  <input id="tokenInput" type="text" placeholder="Или вставьте ссылку / токен сюда..." oninput="handleManualInput(this.value)" />
+  <div id="statusBox" class="status"></div>
+</div>
+<script>
+const sb = document.getElementById('statusBox');
+let isSubmitting = false;
+
+async function submitToken(val) {
+  if (isSubmitting) return;
+  val = (val || '').trim();
+  if (!val) { setStatus('err', 'Пожалуйста, вставьте ссылку или токен.'); return; }
+  isSubmitting = true;
+  setStatus('loading', '⏳ Проверка токена на Steam Deck...');
+  try {
+    const resp = await fetch('/api/vk_token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: val })
+    });
+    const data = await resp.json();
+    if (data && data.success) {
+      setStatus('ok', '🎉 <b>Успешно подключено!</b><br>Вы вошли как: ' + (data.user || 'VK User') + '<br><br>Steam Deck уже обновлен, можете закрыть эту страницу.');
+      document.getElementById('vkAuthLink').style.display = 'none';
+      document.getElementById('pasteBtn').style.display = 'none';
+      document.getElementById('tokenInput').style.display = 'none';
+      const ins = document.querySelector('.instructions');
+      if (ins) ins.style.display = 'none';
+    } else {
+      setStatus('err', '❌ Ошибка: ' + (data?.error || 'Неверный токен. Попробуйте еще раз.'));
+      isSubmitting = false;
+    }
+  } catch (err) {
+    setStatus('err', '❌ Ошибка связи со Steam Deck: ' + err.message);
+    isSubmitting = false;
+  }
+}
+
+function setStatus(type, html) {
+  sb.className = 'status ' + type;
+  sb.innerHTML = html;
+  sb.style.display = 'block';
+}
+
+async function handlePasteButton() {
+  if (navigator.clipboard && navigator.clipboard.readText) {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        document.getElementById('tokenInput').value = text;
+        await submitToken(text);
+        return;
+      }
+    } catch (_) {}
+  }
+  const val = document.getElementById('tokenInput').value;
+  if (val) {
+    await submitToken(val);
+  } else {
+    setStatus('err', 'Буфер обмена пуст. Вставьте ссылку вручную в поле ввода.');
+  }
+}
+
+async function tryAutoReadClipboard() {
+  if (isSubmitting) return;
+  if (!navigator.clipboard || !navigator.clipboard.readText) return;
+  try {
+    const text = await navigator.clipboard.readText();
+    if (text && (text.includes('access_token=') || text.startsWith('vk1.a.') || text.includes('oauth.vk.ru') || text.includes('oauth.vk.com'))) {
+      document.getElementById('tokenInput').value = text;
+      await submitToken(text);
+    }
+  } catch (_) {}
+}
+
+let inputTimeout = null;
+function handleManualInput(val) {
+  clearTimeout(inputTimeout);
+  if (val && (val.includes('access_token=') || val.startsWith('vk1.a.'))) {
+    inputTimeout = setTimeout(() => submitToken(val), 300);
+  }
+}
+
+window.addEventListener('focus', tryAutoReadClipboard);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') { tryAutoReadClipboard(); }
+});
+window.addEventListener('DOMContentLoaded', () => {
+  const hash = window.location.hash || '';
+  const search = window.location.search || '';
+  if (hash.includes('access_token=')) { submitToken(hash); }
+  else if (search.includes('access_token=')) { submitToken(search); }
+});
+</script></body></html>"""
+                    self.wfile.write(html.encode("utf-8"))
+                    return
+
+                elif path == "/spotify/auth":
+                    session = plugin_self._get_or_create_spotify_pkce_session()
+                    host = self.headers.get("Host", "")
+                    target_url = session["auth_url"] if ("127.0.0.1" in host or "localhost" in host) else session["lan_auth_url"]
+                    self.send_response(302)
+                    self.send_header("Location", target_url)
+                    self.end_headers()
+                    return
+
+                elif path in ("/callback", "/spotify/callback"):
+                    error = query.get("error", [""])[0]
+                    if error:
+                        desc = query.get("error_description", ["Авторизация отклонена пользователем"])[0]
+                        self._serve_error_page("Spotify", f"Ошибка: {desc}")
+                        return
+
+                    code = query.get("code", [""])[0]
+                    state = query.get("state", [""])[0]
+
+                    if not code:
+                        self._serve_error_page("Spotify", "Не получен код авторизации от Spotify.")
+                        return
+
+                    expected_state = getattr(plugin_self, "_spotify_auth_state", None)
+                    if expected_state and state != expected_state:
+                        self._serve_error_page("Spotify", "Несоответствие параметра state (CSRF защита)", status_code=403)
+                        return
+
+                    if not requests:
+                        self._serve_error_page("Spotify", "Модуль requests недоступен на Steam Deck.")
+                        return
+
+                    session = plugin_self._spotify_pkce_session or {}
+                    verifier = session.get("verifier", "")
+                    client_id = session.get("client_id") or plugin_self.config.get("spotify_client_id") or SPOTIFY_PUBLIC_CLIENT_ID
+
+                    host = self.headers.get("Host", "")
+                    local_ip = plugin_self._get_local_ip()
+
+                    if state == "loopback":
+                        redirect_uri = "http://127.0.0.1:9911/callback"
+                    elif state == "lan":
+                        redirect_uri = f"http://{local_ip}:9911/callback"
+                    elif "127.0.0.1" in host or "localhost" in host:
+                        redirect_uri = "http://127.0.0.1:9911/callback"
+                    else:
+                        redirect_uri = f"http://{local_ip}:9911/callback"
+
+                    candidates = [redirect_uri]
+                    alt_uri = f"http://{local_ip}:9911/callback" if redirect_uri == "http://127.0.0.1:9911/callback" else "http://127.0.0.1:9911/callback"
+                    if alt_uri not in candidates:
+                        candidates.append(alt_uri)
+
+                    token_data = None
+                    exchange_error = None
+
+                    for target_uri in candidates:
+                        try:
+                            payload = {
+                                "grant_type": "authorization_code",
+                                "client_id": client_id,
+                                "code": code,
+                                "redirect_uri": target_uri,
+                            }
+                            if verifier:
+                                payload["code_verifier"] = verifier
+
+                            resp = requests.post(
+                                "https://accounts.spotify.com/api/token",
+                                data=payload,
+                                headers={
+                                    "Content-Type": "application/x-www-form-urlencoded",
+                                    "User-Agent": "DeckyMus/1.0"
+                                },
+                                timeout=15
+                            )
+                            tdata = resp.json()
+                            if resp.status_code == 200 and "access_token" in tdata:
+                                token_data = tdata
+                                break
+                            else:
+                                exchange_error = tdata.get("error_description") or tdata.get("error") or f"HTTP {resp.status_code}"
+                        except Exception as e:
+                            exchange_error = str(e)
+
+                    if token_data and "access_token" in token_data:
+                        access_tok = token_data["access_token"]
+                        refresh_tok = token_data.get("refresh_token", "")
+                        sync_res = plugin_self._sync_spotify_set_token(access_tok, refresh_tok)
+                        if sync_res.get("success"):
+                            with plugin_self._spotify_lock:
+                                plugin_self._spotify_pkce_session = None
+                            user_name = sync_res.get("user") or "Spotify User"
+                            self._serve_success_page("Spotify", user_name)
+                            return
+                        else:
+                            self._serve_error_page("Spotify", f"Не удалось получить профиль пользователя: {sync_res.get('error')}")
+                            return
+
+                    self._serve_error_page("Spotify", f"Не удалось обменять код на токен: {exchange_error or 'Неизвестная ошибка'}")
+                    return
+
+                elif path in ("/spotify/helper", "/spotify"):
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/html; charset=utf-8")
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.end_headers()
+                    html = """<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DeckyMus — Spotify</title>
+<style>
+body { background: #0f172a; color: #f8fafc; font-family: -apple-system, sans-serif; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 90vh; }
+.card { background: #1e293b; border: 1px solid rgba(30, 215, 96, 0.3); border-radius: 16px; padding: 24px; max-width: 440px; width: 100%; box-shadow: 0 10px 30px rgba(0,0,0,0.5); text-align: center; }
+.btn { display: inline-block; width: 100%; padding: 14px; background: #1ed760; color: #000; font-size: 15px; font-weight: 700; border-radius: 10px; text-decoration: none; border: none; cursor: pointer; margin: 12px 0; box-sizing: border-box; }
+</style></head>
+<body>
+<div class="card">
+<h2 style="margin-top:0">DeckyMus — Spotify</h2>
+<p style="color:#94a3b8; font-size:14px">Подключение Spotify к вашему Steam Deck</p>
+<a class="btn" href="/spotify/auth">Войти через Spotify (OAuth)</a>
+<p style="font-size:12px; color:#64748b; margin-top:16px">После подтверждения сессия будет автоматически активирована на консоли.</p>
+</div>
+</body></html>"""
+                    self.wfile.write(html.encode("utf-8"))
+                    return
+
+                self.send_response(404)
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+
+            def do_POST(self):
+                parsed = urllib.parse.urlparse(self.path)
+                length = int(self.headers.get("Content-Length", 0))
+                body = self.rfile.read(length)
+                try:
+                    payload = json.loads(body.decode("utf-8"))
+                except Exception:
+                    payload = {}
+
+                if parsed.path in ("/yandex/token", "/api/yandex_token"):
+                    raw_token = payload.get("token", "")
+                    if not raw_token:
+                        for k in ("url", "access_token", "link"):
+                            if k in payload and payload[k]:
+                                raw_token = str(payload[k]).strip()
+                                break
+                    if not raw_token and body:
+                        try:
+                            qs = urllib.parse.parse_qs(body.decode("utf-8", errors="replace"))
+                            for k in ("token", "url", "access_token", "link"):
+                                if k in qs and qs[k]:
+                                    raw_token = qs[k][0].strip()
+                                    break
+                        except Exception:
+                            pass
+                    if not raw_token and body:
+                        raw_token = body.decode("utf-8", errors="replace").strip()
+
+                    res = plugin_self._sync_yandex_set_token(raw_token)
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.end_headers()
+                    self.wfile.write(json.dumps(res).encode("utf-8"))
+                    return
+
+                elif parsed.path == "/api/vk_token":
+                    token = payload.get("token", "")
+                    if not token:
+                        for k in ("url", "access_token", "link"):
+                            if k in payload and payload[k]:
+                                token = str(payload[k]).strip()
+                                break
+                    if not token and body:
+                        try:
+                            qs = urllib.parse.parse_qs(body.decode("utf-8", errors="replace"))
+                            for k in ("token", "url", "access_token", "link"):
+                                if k in qs and qs[k]:
+                                    token = qs[k][0].strip()
+                                    break
+                        except Exception:
+                            pass
+                    if not token and body:
+                        token = body.decode("utf-8", errors="replace").strip()
+
+                    res = plugin_self._sync_vk_set_token(token)
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.end_headers()
+                    self.wfile.write(json.dumps(res).encode("utf-8"))
+                    return
+
+                elif parsed.path == "/api/spotify_credentials":
+                    cid = payload.get("client_id", "")
+                    sec = payload.get("client_secret", "")
+                    res = plugin_self._sync_spotify_set_credentials(cid, sec)
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.end_headers()
+                    self.wfile.write(json.dumps(res).encode("utf-8"))
+                    return
+
+                elif parsed.path == "/api/spotify_token":
+                    tok = payload.get("token", "")
+                    refresh_token = payload.get("refresh_token", "")
+                    res = plugin_self._sync_spotify_set_token(tok, refresh_token)
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.end_headers()
+                    self.wfile.write(json.dumps(res).encode("utf-8"))
+                    return
+
+                self.send_response(404)
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+
+        server = None
+        for attempt in range(5):
+            try:
+                server = ReusableHTTPServer(("0.0.0.0", 9911), AuthHandler)
+                break
+            except (OSError, Exception) as e:
+                if attempt < 4:
+                    time.sleep(0.05 * (attempt + 1))
+                    continue
+                logger.warning(f"Failed to start Auth HTTP server on port 9911: {e}")
+                return
+
+        self._auth_server = server
+
+        def _serve():
+            try:
+                server.serve_forever()
+            except Exception as e:
+                logger.warning(f"Auth HTTP server note: {e}")
+
+        self._auth_server_thread = threading.Thread(target=_serve, daemon=True)
+        self._auth_server_thread.start()
+        logger.info(f"DeckyMus Auth HTTP Server started on http://{self._get_local_ip()}:9911")
+
+    def _stop_auth_server(self):
+        with self._auth_server_lock:
+            server = self._auth_server
+            thread = self._auth_server_thread
+            self._auth_server = None
+            self._auth_server_thread = None
+
+            if server:
+                if thread and thread.is_alive() and threading.current_thread() != thread:
+                    try:
+                        server.shutdown()
+                    except Exception:
+                        pass
+                try:
+                    server.server_close()
+                except Exception:
+                    pass
+
+            if thread and thread.is_alive() and threading.current_thread() != thread:
+                try:
+                    thread.join(timeout=3.0)
+                except Exception:
+                    pass
+
+    # ==================== VK Музыка ====================
+
+    def _clean_vk_token(self, token_or_url: str) -> str:
+        s = (token_or_url or "").strip().strip("\"'").strip()
+        if not s:
+            return ""
+        s = urllib.parse.unquote(s).strip()
+        if "://" in s or "blank.html" in s or "error=" in s or "oauth.vk.com" in s or "oauth.vk.ru" in s:
+            if "access_token=" not in s:
+                return ""
+        if "access_token=" in s:
+            m = re.search(r"access_token=([^&\s#]+)", s)
+            if m:
+                s = m.group(1)
+            else:
+                return ""
+        s = urllib.parse.unquote(s).strip()
+        if "://" in s or "blank.html" in s or "error=" in s:
+            return ""
+        return s
+
+    def _call_vk_api(self, method: str, params: dict = None) -> dict:
+        if not requests:
+            return {"error": {"error_msg": "requests недоступен"}}
+        params = params or {}
+        token = params.get("access_token") or self.config.get("vk_token", "")
+        if not token:
+            return {"error": {"error_msg": "VK токен не установлен"}}
+        url = f"https://api.vk.com/method/{method}"
+        headers = {
+            "User-Agent": VK_USER_AGENT,
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
+            "Origin": "https://vk.com",
+            "Referer": "https://vk.com/"
+        }
+        data = {
+            "v": VK_API_VERSION,
+            "access_token": token
+        }
+        data.update(params)
+        try:
+            resp = requests.post(url, headers=headers, data=data, timeout=20)
+            return resp.json()
+        except Exception as e:
+            logger.error(f"VK API error on {method}: {e}")
+            return {"error": {"error_msg": str(e)}}
+
+    async def _init_vk_client(self, token: str):
+        cleaned = self._clean_vk_token(token)
+        if not cleaned or not requests:
+            self._vk_user = None
+            self._vk_logged_in = False
+            return None
+        def _check():
+            try:
+                res = self._call_vk_api("users.get", {
+                    "access_token": cleaned,
+                    "fields": "photo_100,first_name,last_name"
+                })
+                if "response" in res and res["response"]:
+                    u = res["response"][0]
+                    first = u.get("first_name", "")
+                    last = u.get("last_name", "")
+                    full = f"{first} {last}".strip() or "VK User"
+                    return {
+                        "id": str(u.get("id", "")),
+                        "name": full,
+                        "avatar": u.get("photo_100", "")
+                    }
+            except Exception as e:
+                logger.error(f"VK client check exception: {e}")
+            return None
+
+        user_info = await asyncio.to_thread(_check)
+        if user_info:
+            self._vk_user = user_info
+            self._vk_logged_in = True
+            self.config["vk_user"] = user_info
+            self.config["vk_token"] = cleaned
+            self._save_config()
+        else:
+            self._vk_user = None
+            self._vk_logged_in = False
+        return self._vk_user
+
+    def _sync_vk_set_token(self, token: str) -> dict:
+        cleaned = self._clean_vk_token(token)
+        if not cleaned or not requests:
+            return {"success": False, "error": "Неверный токен"}
+        try:
+            res = self._call_vk_api("users.get", {
+                "access_token": cleaned,
+                "fields": "photo_100,first_name,last_name"
+            })
+            if "response" in res and res["response"]:
+                u = res["response"][0]
+                first = u.get("first_name", "")
+                last = u.get("last_name", "")
+                full = f"{first} {last}".strip() or "VK User"
+                user_info = {
+                    "id": str(u.get("id", "")),
+                    "name": full,
+                    "avatar": u.get("photo_100", "")
+                }
+                self._vk_user = user_info
+                self._vk_logged_in = True
+                self.config["vk_user"] = user_info
+                self.config["vk_token"] = cleaned
+                self._save_config()
+                return {"success": True, "user": full, "id": user_info["id"], "avatar": user_info["avatar"]}
+            else:
+                err = res.get("error", {}).get("error_msg", "Ошибка токена VK")
+                return {"success": False, "error": err}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    async def vk_set_token(self, token: str):
+        return await asyncio.to_thread(self._sync_vk_set_token, token)
+
+    async def vk_logout(self):
+        self.config["vk_token"] = ""
+        self.config["vk_user"] = {}
+        self._vk_user = None
+        self._vk_logged_in = False
+        self._save_config()
+        return {"success": True}
+
+    async def _vk_browser_monitor_loop(self):
+        """Continuously monitors Steam CEF DevTools for VK, Yandex, or Spotify OAuth completion to auto-capture token and close tab."""
+        while True:
+            try:
+                await asyncio.to_thread(self._check_steam_cef_for_vk_token)
+                await asyncio.sleep(0.5)
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.debug(f"CEF browser monitor loop error: {e}")
+                await asyncio.sleep(1.0)
+
+    def _evaluate_cef_js(self, target_identifier: str, expr: str):
+        try:
+            req = urllib.request.Request("http://127.0.0.1:8080/json")
+            with urllib.request.urlopen(req, timeout=0.6) as resp:
+                targets = json.loads(resp.read().decode("utf-8"))
+                for t in targets:
+                    if t.get("id") == target_identifier or (t.get("webSocketDebuggerUrl") and target_identifier in t.get("webSocketDebuggerUrl")):
+                        ws_url = t.get("webSocketDebuggerUrl")
+                        if not ws_url:
+                            continue
+                        import socket, base64, os, struct
+                        path = ws_url.split(":8080")[1]
+                        s = socket.socket()
+                        s.settimeout(0.6)
+                        s.connect(("127.0.0.1", 8080))
+                        key = base64.b64encode(os.urandom(16)).decode()
+                        req_str = f"GET {path} HTTP/1.1\r\nHost: 127.0.0.1:8080\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n"
+                        s.sendall(req_str.encode())
+                        buf = b""
+                        while b"\r\n\r\n" not in buf:
+                            buf += s.recv(1024)
+                        payload = json.dumps({"id": 1001, "method": "Runtime.evaluate", "params": {"expression": expr}}).encode()
+                        length = len(payload)
+                        if length < 126:
+                            hdr = bytes([0x81, 0x80 | length])
+                        elif length <= 65535:
+                            hdr = bytes([0x81, 0x80 | 126]) + struct.pack("!H", length)
+                        else:
+                            hdr = bytes([0x81, 0x80 | 127]) + struct.pack("!Q", length)
+                        mask = os.urandom(4)
+                        frame = hdr + mask + bytes([b ^ mask[i % 4] for i, b in enumerate(payload)])
+                        s.sendall(frame)
+                        s.close()
+                        break
+        except Exception:
+            pass
+
+    def _close_cef_target(self, target_id: str):
+        try:
+            close_req = urllib.request.Request(f"http://127.0.0.1:8080/json/close/{target_id}")
+            urllib.request.urlopen(close_req, timeout=0.5)
+            logger.info(f"Closed Steam browser target {target_id}")
+        except Exception:
+            pass
+        # Ask Big Picture to NavigateBack cleanly if external web is open
+        try:
+            req = urllib.request.Request("http://127.0.0.1:8080/json")
+            with urllib.request.urlopen(req, timeout=0.6) as resp:
+                targets = json.loads(resp.read().decode("utf-8"))
+                for t in targets:
+                    ws_url = t.get("webSocketDebuggerUrl")
+                    title = t.get("title", "")
+                    if ws_url and "SharedJSContext" in title:
+                        expr = "try { if (window.DFL && window.DFL.Navigation && typeof window.DFL.Navigation.NavigateBack === 'function') window.DFL.Navigation.NavigateBack(); } catch(e){}"
+                        self._evaluate_cef_js(ws_url, expr)
+        except Exception:
+            pass
+
+    def _dismiss_steam_browser_overlay(self):
+        try:
+            req = urllib.request.Request("http://127.0.0.1:8080/json")
+            with urllib.request.urlopen(req, timeout=0.6) as resp:
+                targets = json.loads(resp.read().decode("utf-8"))
+                for t in targets:
+                    ws_url = t.get("webSocketDebuggerUrl")
+                    title = t.get("title", "")
+                    if ws_url and "SharedJSContext" in title:
+                        expr = "try { if (window.DFL && window.DFL.Navigation && typeof window.DFL.Navigation.NavigateBack === 'function') window.DFL.Navigation.NavigateBack(); } catch(e){}"
+                        self._evaluate_cef_js(ws_url, expr)
+        except Exception:
+            pass
+
+    def _check_steam_cef_for_vk_token(self):
+        try:
+            req = urllib.request.Request("http://127.0.0.1:8080/json")
+            with urllib.request.urlopen(req, timeout=0.8) as resp:
+                targets = json.loads(resp.read().decode("utf-8"))
+                for target in targets:
+                    url = target.get("url", "")
+                    target_id = target.get("id")
+
+                    search_str = f"{url} {urllib.parse.unquote(url)}"
+
+                    # 1. VK OAuth token interception
+                    if not self._vk_logged_in and "access_token" in search_str and ("blank.html" in search_str or "oauth.vk" in search_str or "vk1.a." in search_str):
+                        m = re.search(r"access_token[=:]+([^&\s#\"']+)", search_str)
+                        if m:
+                            token = m.group(1)
+                            logger.info("VK token auto-intercepted from Steam browser session")
+                            if target_id:
+                                success_ui = "document.body.innerHTML = '<div style=\"background:#0f172a;color:#ffffff;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,sans-serif;text-align:center;padding:24px;\"><div style=\"width:64px;height:64px;border-radius:50%;background:#22c55e;display:flex;align-items:center;justify-content:center;font-size:32px;margin-bottom:16px;\">✓</div><h2 style=\"font-size:22px;margin-bottom:8px;\">Вход в ВКонтакте выполнен!</h2><p style=\"color:#94a3b8;font-size:14px;\">Возвращаемся в DeckyMus...</p></div>'; setTimeout(() => { window.close(); if (window.history) window.history.back(); }, 600);"
+                                self._evaluate_cef_js(target_id, success_ui)
+                                threading.Timer(0.7, lambda: self._close_cef_target(target_id)).start()
+                            return self._sync_vk_set_token(token)
+
+                    # 2. Yandex OAuth token interception (Cassette method)
+                    if self._yandex_client is None and "access_token" in search_str and ("verification_code" in search_str or "oauth.yandex" in search_str or "yandex.ru" in search_str):
+                        m = re.search(r"access_token[=:]+([^&\s#\"']+)", search_str)
+                        if m:
+                            token = m.group(1)
+                            logger.info("Yandex token auto-intercepted from Steam browser session (Cassette method)")
+                            if target_id:
+                                success_ui = "document.body.innerHTML = '<div style=\"background:#0f172a;color:#ffffff;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,sans-serif;text-align:center;padding:24px;\"><div style=\"width:64px;height:64px;border-radius:50%;background:#f59e0b;display:flex;align-items:center;justify-content:center;font-size:32px;margin-bottom:16px;\">✓</div><h2 style=\"font-size:22px;margin-bottom:8px;\">Вход в Яндекс Музыку выполнен!</h2><p style=\"color:#94a3b8;font-size:14px;\">Возвращаемся в DeckyMus...</p></div>'; setTimeout(() => { window.close(); if (window.history) window.history.back(); }, 600);"
+                                self._evaluate_cef_js(target_id, success_ui)
+                                threading.Timer(0.7, lambda: self._close_cef_target(target_id)).start()
+                            return self._sync_yandex_set_token(token)
+
+                    # 3. Auto-close remaining pages when already logged in
+                    if self._yandex_client is not None and target_id and ("verification_code" in url or "oauth.yandex.ru" in url or "passport.yandex" in url):
+                        self._close_cef_target(target_id)
+                    elif self._spotify_user is not None and target_id and ("accounts.spotify.com" in url or "9911/callback" in url or "spotify/callback" in url):
+                        self._close_cef_target(target_id)
+
+
+        except Exception:
+            pass
+        return None
+
+    async def vk_get_status(self):
+        if not self._vk_logged_in:
+            await asyncio.to_thread(self._check_steam_cef_for_vk_token)
+        has_token = bool(self.config.get("vk_token"))
+        logged_in = self._vk_user is not None
+        user_name = self._vk_user.get("name", "") if self._vk_user else ""
+        user_id = str(self._vk_user.get("id", "")) if self._vk_user else ""
+        avatar = self._vk_user.get("avatar", "") if self._vk_user else ""
+        local_ip = self._get_local_ip()
+        auth_url = (
+            f"https://oauth.vk.ru/authorize?client_id={VK_CLIENT_ID}"
+            "&scope=audio&redirect_uri=https://oauth.vk.ru/blank.html"
+            "&display=page&response_type=token"
+        )
+        helper_url = f"http://{local_ip}:9911/vk"
+        qr_svg = self._generate_qr_svg(helper_url)
+
+        return {
+            "has_token": has_token,
+            "logged_in": logged_in,
+            "user_name": user_name,
+            "user_id": user_id,
+            "avatar": avatar,
+            "auth_url": auth_url,
+            "helper_url": helper_url,
+            "qr_svg": qr_svg
+        }
+
+    async def vk_get_my_music(self, offset: int = 0, count: int = 2000):
+        def _fetch():
+            out = []
+            cur_offset = offset
+            limit = min(max(1, count), 2000)
+            while len(out) < limit:
+                chunk_count = min(1000, limit - len(out))
+                res = self._call_vk_api("audio.get", {"offset": cur_offset, "count": chunk_count})
+                if "response" not in res:
+                    break
+                items = res["response"].get("items", [])
+                if not items:
+                    break
+                for item in items:
+                    aid = str(item.get("id", ""))
+                    oid = str(item.get("owner_id", ""))
+                    album_obj = item.get("album") or {}
+                    thumb = album_obj.get("thumb") or album_obj.get("photo") or {}
+                    cover = thumb.get("photo_600") or thumb.get("photo_300") or thumb.get("photo_135") or ""
+                    out.append({
+                        "id": f"vk_{oid}_{aid}",
+                        "title": item.get("title", "Трек"),
+                        "artist": item.get("artist", "Исполнитель"),
+                        "album": album_obj.get("title", ""),
+                        "duration": int(item.get("duration", 0)),
+                        "art_url": cover,
+                        "url": item.get("url", ""),
+                        "source": "vk"
+                    })
+                cur_offset += len(items)
+                if len(items) < chunk_count:
+                    break
+            return out
+        return await asyncio.to_thread(_fetch)
+
+    async def vk_get_playlists(self, offset: int = 0, count: int = 50):
+        def _fetch():
+            owner_id = self._vk_user.get("id") if self._vk_user else ""
+            params = {"offset": offset, "count": count}
+            if owner_id:
+                params["owner_id"] = owner_id
+            res = self._call_vk_api("audio.getPlaylists", params)
+            if "response" not in res:
+                return []
+            items = res["response"].get("items", [])
+            out = []
+            for item in items:
+                thumb = item.get("photo") or item.get("thumb") or {}
+                cover = thumb.get("photo_600") or thumb.get("photo_300") or thumb.get("photo_135") or ""
+                out.append({
+                    "id": str(item.get("id", "")),
+                    "owner_id": str(item.get("owner_id", "")),
+                    "title": item.get("title", "Плейлист"),
+                    "track_count": int(item.get("count", 0)),
+                    "cover": cover,
+                    "description": item.get("description", "")
+                })
+            return out
+        return await asyncio.to_thread(_fetch)
+
+    async def vk_get_playlist_tracks(self, playlist_id: str, owner_id: str = "", offset: int = 0, count: int = 100):
+        def _fetch():
+            params = {
+                "album_id": playlist_id,
+                "offset": offset,
+                "count": count
+            }
+            if owner_id:
+                params["owner_id"] = owner_id
+            res = self._call_vk_api("audio.get", params)
+            if "response" not in res:
+                return []
+            items = res["response"].get("items", [])
+            out = []
+            for item in items:
+                aid = str(item.get("id", ""))
+                oid = str(item.get("owner_id", ""))
+                album_obj = item.get("album") or {}
+                thumb = album_obj.get("thumb") or album_obj.get("photo") or {}
+                cover = thumb.get("photo_600") or thumb.get("photo_300") or thumb.get("photo_135") or ""
+                out.append({
+                    "id": f"vk_{oid}_{aid}",
+                    "title": item.get("title", "Трек"),
+                    "artist": item.get("artist", "Исполнитель"),
+                    "album": album_obj.get("title", ""),
+                    "duration": int(item.get("duration", 0)),
+                    "art_url": cover,
+                    "url": item.get("url", ""),
+                    "source": "vk"
+                })
+            return out
+        return await asyncio.to_thread(_fetch)
+
+    async def vk_search(self, query: str, offset: int = 0, count: int = 50):
+        if not query or not query.strip():
+            return []
+        def _fetch():
+            res = self._call_vk_api("audio.search", {
+                "q": query.strip(),
+                "offset": offset,
+                "count": count,
+                "auto_complete": 1
+            })
+            if "response" not in res:
+                return []
+            items = res["response"].get("items", [])
+            out = []
+            for item in items:
+                aid = str(item.get("id", ""))
+                oid = str(item.get("owner_id", ""))
+                album_obj = item.get("album") or {}
+                thumb = album_obj.get("thumb") or album_obj.get("photo") or {}
+                cover = thumb.get("photo_600") or thumb.get("photo_300") or thumb.get("photo_135") or ""
+                out.append({
+                    "id": f"vk_{oid}_{aid}",
+                    "title": item.get("title", "Трек"),
+                    "artist": item.get("artist", "Исполнитель"),
+                    "album": album_obj.get("title", ""),
+                    "duration": int(item.get("duration", 0)),
+                    "art_url": cover,
+                    "url": item.get("url", ""),
+                    "source": "vk"
+                })
+            return out
+        return await asyncio.to_thread(_fetch)
+
+    def _sync_resolve_vk_url(self, track: dict) -> str:
+        # Check existing url in track object
+        u = track.get("url", "")
+        if u and ("index.m3u8" in u or ".mp3" in u):
+            return u
+        # Fallback to audio.getById
+        tid = track.get("id", "")
+        raw_id = tid.replace("vk_", "")
+        res = self._call_vk_api("audio.getById", {"audios": raw_id})
+        if "response" in res and res["response"]:
+            item = res["response"][0]
+            fresh_url = item.get("url", "")
+            if fresh_url:
+                track["url"] = fresh_url
+                return fresh_url
+        return ""
+
+    async def _resolve_vk_url(self, track: dict) -> str:
+        return await asyncio.to_thread(self._sync_resolve_vk_url, track)
+
+    # ==================== Spotify ====================
+
+    def _compute_pkce_challenge(self, verifier: str) -> str:
+        digest = hashlib.sha256(verifier.encode("ascii")).digest()
+        return base64.urlsafe_b64encode(digest).decode("ascii").rstrip("=")
+
+    def _get_or_create_spotify_pkce_session(self) -> dict:
+        with self._spotify_lock:
+            now = time.time()
+            if self._spotify_pkce_session:
+                created_at = self._spotify_pkce_session.get("created_at", 0)
+                if now - created_at < SPOTIFY_PKCE_TTL:
+                    return self._spotify_pkce_session
+
+            client_id = self.config.get("spotify_client_id") or SPOTIFY_PUBLIC_CLIENT_ID
+            verifier = secrets.token_urlsafe(64)
+            challenge = self._compute_pkce_challenge(verifier)
+
+            local_ip = self._get_local_ip()
+            loopback_redirect = "http://127.0.0.1:9911/callback"
+            lan_redirect = f"http://{local_ip}:9911/callback"
+
+            scope_encoded = urllib.parse.quote(SPOTIFY_AUTH_SCOPE)
+
+            auth_url = (
+                f"https://accounts.spotify.com/authorize?client_id={client_id}"
+                f"&response_type=code"
+                f"&redirect_uri={urllib.parse.quote(loopback_redirect, safe='')}"
+                f"&code_challenge_method=S256"
+                f"&code_challenge={challenge}"
+                f"&scope={scope_encoded}"
+                f"&state=loopback"
+            )
+
+            lan_auth_url = (
+                f"https://accounts.spotify.com/authorize?client_id={client_id}"
+                f"&response_type=code"
+                f"&redirect_uri={urllib.parse.quote(lan_redirect, safe='')}"
+                f"&code_challenge_method=S256"
+                f"&code_challenge={challenge}"
+                f"&scope={scope_encoded}"
+                f"&state=lan"
+            )
+
+            qr_svg = self._generate_qr_svg(lan_auth_url)
+
+            session = {
+                "client_id": client_id,
+                "verifier": verifier,
+                "challenge": challenge,
+                "auth_url": auth_url,
+                "lan_auth_url": lan_auth_url,
+                "qr_svg": qr_svg,
+                "created_at": now,
+            }
+            self._spotify_pkce_session = session
+            return session
+
+    def _spotify_refresh_access_token(self) -> str:
+        refresh_tok = self.config.get("spotify_refresh_token")
+        if not refresh_tok or not requests:
+            return ""
+        client_id = self.config.get("spotify_client_id") or SPOTIFY_PUBLIC_CLIENT_ID
+        try:
+            resp = requests.post(
+                "https://accounts.spotify.com/api/token",
+                data={
+                    "grant_type": "refresh_token",
+                    "refresh_token": refresh_tok,
+                    "client_id": client_id,
+                },
+                headers={
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "User-Agent": "DeckyMus/1.0"
+                },
+                timeout=15
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                new_tok = data.get("access_token", "")
+                if new_tok:
+                    with self._spotify_lock:
+                        self._spotify_access_token = new_tok
+                        if "refresh_token" in data:
+                            self.config["spotify_refresh_token"] = data["refresh_token"]
+                        expires_in = int(data.get("expires_in", 3600))
+                        self._spotify_token_expires = time.time() + expires_in - 60
+                        with self._config_lock:
+                            self.config["spotify_token"] = new_tok
+                            self._save_config()
+                    return new_tok
+            else:
+                logger.warning(f"Spotify token refresh failed: {resp.status_code} {resp.text}")
+        except Exception as e:
+            logger.error(f"Spotify token refresh exception: {e}")
+        return ""
+
+    def _spotify_ensure_token(self) -> str:
+        now = time.time()
+        if self._spotify_access_token and (self._spotify_token_expires == 0 or now < self._spotify_token_expires):
+            return self._spotify_access_token
+
+        # Try PKCE refresh token
+        refreshed = self._spotify_refresh_access_token()
+        if refreshed:
+            return refreshed
+
+        if self._spotify_access_token:
+            return self._spotify_access_token
+
+        # Legacy client credentials fallback
+        cid = self.config.get("spotify_client_id")
+        sec = self.config.get("spotify_client_secret")
+        if cid and sec and requests:
+            try:
+                resp = requests.post(
+                    "https://accounts.spotify.com/api/token",
+                    data={"grant_type": "client_credentials", "client_id": cid, "client_secret": sec},
+                    headers={"Content-Type": "application/x-www-form-urlencoded"},
+                    timeout=15
+                )
+                data = resp.json()
+                if "access_token" in data:
+                    self._spotify_access_token = data["access_token"]
+                    self._spotify_token_expires = time.time() + int(data.get("expires_in", 3600)) - 60
+                    return self._spotify_access_token
+            except Exception as e:
+                logger.error(f"Spotify client credentials refresh error: {e}")
+        return ""
+
+    def _sync_spotify_set_credentials(self, client_id: str, client_secret: str) -> dict:
+        if not requests:
+            return {"success": False, "error": "requests недоступен"}
+        cid = client_id.strip()
+        sec = client_secret.strip()
+        try:
+            resp = requests.post(
+                "https://accounts.spotify.com/api/token",
+                data={"grant_type": "client_credentials", "client_id": cid, "client_secret": sec},
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                timeout=15
+            )
+            data = resp.json()
+            if "access_token" in data:
+                with self._config_lock:
+                    self.config["spotify_client_id"] = cid
+                    self.config["spotify_client_secret"] = sec
+                    self.config["spotify_token"] = data["access_token"]
+                    self._save_config()
+                with self._spotify_lock:
+                    self._spotify_access_token = data["access_token"]
+                    self._spotify_token_expires = 0
+                return {"success": True}
+            else:
+                err = data.get("error_description") or data.get("error") or "Неверные ключи"
+                return {"success": False, "error": err}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    async def spotify_set_credentials(self, client_id: str, client_secret: str):
+        return await asyncio.to_thread(self._sync_spotify_set_credentials, client_id, client_secret)
+
+    def _sync_spotify_set_token(self, token: str, refresh_token: str = "") -> dict:
+        tok = token.strip()
+        if not tok or not requests:
+            return {"success": False, "error": "Неверный токен"}
+        try:
+            resp = requests.get(
+                "https://api.spotify.com/v1/me",
+                headers={"Authorization": f"Bearer {tok}", "User-Agent": "DeckyMus/1.0"},
+                timeout=15
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                name = data.get("display_name") or data.get("id") or "Spotify User"
+                images = data.get("images") or []
+                avatar = images[0].get("url", "") if images else ""
+                prod = data.get("product", "Free")
+                user_info = {
+                    "id": data.get("id", ""),
+                    "name": name,
+                    "avatar": avatar,
+                    "product": prod
+                }
+                with self._spotify_lock:
+                    self._spotify_user = user_info
+                    self._spotify_access_token = tok
+                    self._spotify_token_expires = time.time() + 3540
+                    with self._config_lock:
+                        self.config["spotify_user"] = user_info
+                        self.config["spotify_token"] = tok
+                        if refresh_token:
+                            self.config["spotify_refresh_token"] = refresh_token.strip()
+                        self._save_config()
+                return {"success": True, "user": name, "id": user_info["id"], "avatar": avatar, "product": prod}
+            else:
+                return {"success": False, "error": f"Ошибка {resp.status_code}: Недействительный токен"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    async def spotify_set_token(self, token: str, refresh_token: str = ""):
+        return await asyncio.to_thread(self._sync_spotify_set_token, token, refresh_token)
+
+    async def spotify_logout(self):
+        with self._spotify_lock:
+            self._spotify_pkce_session = None
+            self._spotify_auth_state = None
+            self._spotify_user = None
+            self._spotify_access_token = ""
+            self._spotify_token_expires = 0
+            with self._config_lock:
+                self.config["spotify_token"] = ""
+                self.config["spotify_refresh_token"] = ""
+                self.config["spotify_user"] = {}
+                self._save_config()
+        return {"success": True}
+
+    async def _init_spotify_client(self):
+        tok = self.config.get("spotify_token", "")
+        refresh_tok = self.config.get("spotify_refresh_token", "")
+        if tok:
+            await self.spotify_set_token(tok, refresh_tok)
+        elif refresh_tok:
+            await asyncio.to_thread(self._spotify_ensure_token)
+        else:
+            cid = self.config.get("spotify_client_id", "")
+            sec = self.config.get("spotify_client_secret", "")
+            if cid and sec:
+                await self.spotify_set_credentials(cid, sec)
+
+    async def spotify_get_status(self):
+        has_token = bool(self.config.get("spotify_token") or self._spotify_access_token)
+        logged_in = self._spotify_user is not None
+        user_name = self._spotify_user.get("name", "") if self._spotify_user else ""
+        user_id = self._spotify_user.get("id", "") if self._spotify_user else ""
+        avatar = self._spotify_user.get("avatar", "") if self._spotify_user else ""
+        product = self._spotify_user.get("product", "") if self._spotify_user else ""
+        local_ip = self._get_local_ip()
+
+        if logged_in:
+            return {
+                "has_token": has_token,
+                "logged_in": True,
+                "user_name": user_name,
+                "user_id": user_id,
+                "avatar": avatar,
+                "product": product,
+                "has_credentials": True,
+                "auth_url": "",
+                "helper_url": f"http://{local_ip}:9911/spotify",
+                "qr_svg": ""
+            }
+
+        session = self._get_or_create_spotify_pkce_session()
+        return {
+            "has_token": has_token,
+            "logged_in": False,
+            "user_name": "",
+            "user_id": "",
+            "avatar": "",
+            "product": "",
+            "has_credentials": True,
+            "auth_url": session["auth_url"],
+            "helper_url": f"http://{local_ip}:9911/spotify",
+            "qr_svg": session["qr_svg"]
+        }
+
+    async def spotify_get_playlists(self, offset: int = 0, limit: int = 50):
+        def _fetch():
+            tok = self._spotify_ensure_token()
+            if not tok or not requests:
+                return []
+            endpoint = "https://api.spotify.com/v1/me/playlists" if self._spotify_user else "https://api.spotify.com/v1/browse/featured-playlists"
+            try:
+                resp = requests.get(
+                    endpoint,
+                    headers={"Authorization": f"Bearer {tok}"},
+                    params={"limit": limit, "offset": offset},
+                    timeout=15
+                )
+                if resp.status_code != 200:
+                    return []
+                data = resp.json()
+                items = data.get("playlists", {}).get("items", []) if "playlists" in data else data.get("items", [])
+                out = []
+                for p in items:
+                    if not p:
+                        continue
+                    imgs = p.get("images") or []
+                    cover = imgs[0].get("url", "") if imgs else ""
+                    out.append({
+                        "id": p.get("id", ""),
+                        "title": p.get("name", "Плейлист"),
+                        "track_count": int(p.get("tracks", {}).get("total", 0)),
+                        "cover": cover,
+                        "owner_name": p.get("owner", {}).get("display_name", "")
+                    })
+                return out
+            except Exception as e:
+                logger.error(f"Spotify get playlists error: {e}")
+                return []
+        return await asyncio.to_thread(_fetch)
+
+    async def spotify_get_playlist_tracks(self, playlist_id: str, offset: int = 0, limit: int = 100):
+        def _fetch():
+            tok = self._spotify_ensure_token()
+            if not tok or not requests:
+                return []
+            try:
+                resp = requests.get(
+                    f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks",
+                    headers={"Authorization": f"Bearer {tok}"},
+                    params={"limit": limit, "offset": offset},
+                    timeout=15
+                )
+                if resp.status_code != 200:
+                    return []
+                items = resp.json().get("items", [])
+                out = []
+                for item in items:
+                    t = item.get("track") if "track" in item else item
+                    if not t or not t.get("id"):
+                        continue
+                    album = t.get("album") or {}
+                    imgs = album.get("images") or []
+                    cover = imgs[0].get("url", "") if imgs else ""
+                    artists = ", ".join(a.get("name", "") for a in t.get("artists", []))
+                    out.append({
+                        "id": f"sp_{t.get('id')}",
+                        "title": t.get("name", "Трек"),
+                        "artist": artists or "Spotify",
+                        "album": album.get("name", ""),
+                        "duration": int((t.get("duration_ms") or 0) / 1000),
+                        "art_url": cover,
+                        "url": t.get("preview_url") or "",
+                        "source": "spotify"
+                    })
+                return out
+            except Exception as e:
+                logger.error(f"Spotify playlist tracks error: {e}")
+                return []
+        return await asyncio.to_thread(_fetch)
+
+    async def spotify_get_liked_tracks(self, offset: int = 0, limit: int = 50):
+        def _fetch():
+            tok = self._spotify_ensure_token()
+            if not tok or not requests:
+                return []
+            try:
+                resp = requests.get(
+                    "https://api.spotify.com/v1/me/tracks",
+                    headers={"Authorization": f"Bearer {tok}"},
+                    params={"limit": limit, "offset": offset},
+                    timeout=15
+                )
+                if resp.status_code != 200:
+                    return []
+                items = resp.json().get("items", [])
+                out = []
+                for item in items:
+                    t = item.get("track")
+                    if not t or not t.get("id"):
+                        continue
+                    album = t.get("album") or {}
+                    imgs = album.get("images") or []
+                    cover = imgs[0].get("url", "") if imgs else ""
+                    artists = ", ".join(a.get("name", "") for a in t.get("artists", []))
+                    out.append({
+                        "id": f"sp_{t.get('id')}",
+                        "title": t.get("name", "Трек"),
+                        "artist": artists or "Spotify",
+                        "album": album.get("name", ""),
+                        "duration": int((t.get("duration_ms") or 0) / 1000),
+                        "art_url": cover,
+                        "url": t.get("preview_url") or "",
+                        "source": "spotify"
+                    })
+                return out
+            except Exception as e:
+                logger.error(f"Spotify liked tracks error: {e}")
+                return []
+        return await asyncio.to_thread(_fetch)
+
+    async def spotify_search(self, query: str, offset: int = 0, limit: int = 50):
+        if not query or not query.strip():
+            return []
+        def _fetch():
+            tok = self._spotify_ensure_token()
+            if not tok or not requests:
+                return []
+            try:
+                resp = requests.get(
+                    "https://api.spotify.com/v1/search",
+                    headers={"Authorization": f"Bearer {tok}"},
+                    params={"q": query.strip(), "type": "track", "limit": limit, "offset": offset},
+                    timeout=15
+                )
+                if resp.status_code != 200:
+                    return []
+                items = resp.json().get("tracks", {}).get("items", [])
+                out = []
+                for t in items:
+                    if not t or not t.get("id"):
+                        continue
+                    album = t.get("album") or {}
+                    imgs = album.get("images") or []
+                    cover = imgs[0].get("url", "") if imgs else ""
+                    artists = ", ".join(a.get("name", "") for a in t.get("artists", []))
+                    out.append({
+                        "id": f"sp_{t.get('id')}",
+                        "title": t.get("name", "Трек"),
+                        "artist": artists or "Spotify",
+                        "album": album.get("name", ""),
+                        "duration": int((t.get("duration_ms") or 0) / 1000),
+                        "art_url": cover,
+                        "url": t.get("preview_url") or "",
+                        "source": "spotify"
+                    })
+                return out
+            except Exception as e:
+                logger.error(f"Spotify search error: {e}")
+                return []
+        return await asyncio.to_thread(_fetch)
+
+    async def _resolve_spotify_url(self, track: dict) -> str:
+        title = track.get("title", "")
+        artist = track.get("artist", "")
+        if not yt_dlp:
+            return track.get("url", "")
+        def _resolve():
+            try:
+                search_query = f"ytsearch1:{artist} - {title} audio" if artist else f"ytsearch1:{title} audio"
+                ydl_opts = {
+                    "format": "bestaudio/best",
+                    "quiet": True,
+                    "no_warnings": True,
+                    "extract_flat": False
+                }
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(search_query, download=False)
+                    entries = info.get("entries")
+                    if entries and len(entries) > 0:
+                        return entries[0].get("url", "")
+                    return info.get("url", "")
+            except Exception as e:
+                logger.error(f"Spotify stream resolve error: {e}")
+                return track.get("url", "")
         return await asyncio.to_thread(_resolve)

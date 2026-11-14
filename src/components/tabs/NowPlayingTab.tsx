@@ -3,6 +3,7 @@ import {
   PanelSection,
   PanelSectionRow,
   DialogButton,
+  Focusable,
 } from "@decky/ui";
 import {
   FaPlay,
@@ -97,7 +98,7 @@ export const NowPlayingTab: FC<NowPlayingTabProps> = ({ status, onRefresh }) => 
         overflowX: "hidden",
       }}
     >
-      <PanelSection title={t("nowPlayingHeader")}>
+      <PanelSection>
         <PanelSectionRow>
           <div
             style={{
@@ -252,6 +253,8 @@ export const NowPlayingTab: FC<NowPlayingTabProps> = ({ status, onRefresh }) => 
                             ? "rgba(236, 92, 247, 0.25)"
                             : status.track?.source === "yandex"
                             ? "rgba(234, 179, 8, 0.25)"
+                            : status.track?.source === "spotify"
+                            ? "rgba(30, 215, 96, 0.25)"
                             : status.track?.source === "ytmusic"
                             ? "rgba(239, 68, 68, 0.25)"
                             : "rgba(59, 130, 246, 0.25)",
@@ -260,6 +263,8 @@ export const NowPlayingTab: FC<NowPlayingTabProps> = ({ status, onRefresh }) => 
                             ? "#ec5cf7"
                             : status.track?.source === "yandex"
                             ? "#facc15"
+                            : status.track?.source === "spotify"
+                            ? "#1ed760"
                             : status.track?.source === "ytmusic"
                             ? "#f87171"
                             : "#60a5fa",
@@ -269,6 +274,8 @@ export const NowPlayingTab: FC<NowPlayingTabProps> = ({ status, onRefresh }) => 
                         ? t("sourceVk")
                         : status.track?.source === "yandex"
                         ? t("sourceYandex")
+                        : status.track?.source === "spotify"
+                        ? t("sourceSpotify")
                         : status.track?.source === "ytmusic"
                         ? t("sourceYtmusic")
                         : status.track?.source === "local"
@@ -312,7 +319,8 @@ export const NowPlayingTab: FC<NowPlayingTabProps> = ({ status, onRefresh }) => 
               )}
 
               {/* Playback Controls Row */}
-              <div
+              <Focusable
+                flow-children="row"
                 style={{
                   display: "grid",
                   gridTemplateColumns: "repeat(5, 1fr)",
@@ -325,6 +333,7 @@ export const NowPlayingTab: FC<NowPlayingTabProps> = ({ status, onRefresh }) => 
               >
                 {/* Shuffle */}
                 <DialogButton
+                  className="deckymus-ctrl-btn"
                   onClick={() => handleAction(rpcToggleShuffle)}
                   style={{
                     minWidth: 0,
@@ -340,6 +349,7 @@ export const NowPlayingTab: FC<NowPlayingTabProps> = ({ status, onRefresh }) => 
 
                 {/* Prev */}
                 <DialogButton
+                  className="deckymus-ctrl-btn"
                   disabled={!hasTrack}
                   onClick={() => handleAction(rpcPreviousTrack)}
                   style={{
@@ -355,6 +365,7 @@ export const NowPlayingTab: FC<NowPlayingTabProps> = ({ status, onRefresh }) => 
 
                 {/* Play/Pause */}
                 <DialogButton
+                  className="deckymus-ctrl-btn"
                   disabled={!hasTrack}
                   onClick={() => handleAction(rpcPlayPause)}
                   style={{
@@ -371,6 +382,7 @@ export const NowPlayingTab: FC<NowPlayingTabProps> = ({ status, onRefresh }) => 
 
                 {/* Next */}
                 <DialogButton
+                  className="deckymus-ctrl-btn"
                   disabled={!hasTrack}
                   onClick={() => handleAction(rpcNextTrack)}
                   style={{
@@ -386,6 +398,7 @@ export const NowPlayingTab: FC<NowPlayingTabProps> = ({ status, onRefresh }) => 
 
                 {/* Repeat */}
                 <DialogButton
+                  className="deckymus-ctrl-btn"
                   onClick={handleRepeatCycle}
                   style={{
                     minWidth: 0,
@@ -402,7 +415,7 @@ export const NowPlayingTab: FC<NowPlayingTabProps> = ({ status, onRefresh }) => 
                     {status.repeat === "one" ? t("repeatMode1") : status.repeat === "all" ? t("repeatModeAll") : t("repeatModeOff")}
                   </span>
                 </DialogButton>
-              </div>
+              </Focusable>
             </div>
 
             {/* Right Column: Vertical Independent Volume Control */}
